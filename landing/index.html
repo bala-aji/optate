@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optate — Design Inspection for Your Dev Server</title>
+  <meta name="description" content="Inspect, edit, and export CSS changes from your running app. Copy to AI. Ship faster." />
+  <meta property="og:title" content="Optate — Design Inspection for Your Dev Server" />
+  <meta property="og:description" content="Inspect, edit, and export CSS changes from your running app. Copy to AI. Ship faster." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000;
+      --surface: rgba(255,255,255,0.04);
+      --surface-2: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text: rgba(255,255,255,0.92);
+      --text-secondary: rgba(255,255,255,0.5);
+      --text-tertiary: rgba(255,255,255,0.3);
+      --green: #34d399;
+      --green-dim: rgba(52,211,153,0.12);
+      --orange: #f97316;
+      --blue: #60a5fa;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Glow spots ── */
+    .glow-1, .glow-2, .glow-3 {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-1 { width: 600px; height: 600px; background: rgba(52,211,153,0.06); top: -200px; left: 50%; transform: translateX(-50%); }
+    .glow-2 { width: 400px; height: 400px; background: rgba(249,115,22,0.05); top: 600px; right: -100px; }
+    .glow-3 { width: 500px; height: 500px; background: rgba(96,165,250,0.04); bottom: 200px; left: -150px; }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 0.5px solid var(--border);
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+    }
+
+    .logo {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--green); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn-nav {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--bg) !important;
+      background: var(--text);
+      padding: 7px 16px;
+      border-radius: 20px;
+      transition: opacity 0.15s !important;
+    }
+    .btn-nav:hover { opacity: 0.85; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 160px 0 100px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--green-dim);
+      border: 0.5px solid rgba(52,211,153,0.25);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--green);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 72px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 .accent { color: var(--green); }
+
+    .hero p {
+      font-size: 20px;
+      color: var(--text-secondary);
+      max-width: 560px;
+      margin: 0 auto 48px;
+      font-weight: 400;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green);
+      color: #000;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 13px 28px;
+      border-radius: 30px;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 500;
+      padding: 13px 28px;
+      border-radius: 30px;
+      text-decoration: none;
+      border: 0.5px solid var(--border-strong);
+      letter-spacing: -0.01em;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+
+    /* ── Terminal Hero ── */
+    .terminal-wrap {
+      margin: 72px auto 0;
+      max-width: 680px;
+    }
+
+    .terminal {
+      background: rgba(255,255,255,0.04);
+      border: 0.5px solid var(--border-strong);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      background: rgba(255,255,255,0.05);
+      border-bottom: 0.5px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .terminal-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .terminal-dot:nth-child(1) { background: #ff5f57; }
+    .terminal-dot:nth-child(2) { background: #febc2e; }
+    .terminal-dot:nth-child(3) { background: #28c840; }
+
+    .terminal-title {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-left: 8px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .terminal-body {
+      padding: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .t-comment { color: rgba(255,255,255,0.3); }
+    .t-cmd::before { content: '$ '; color: var(--green); }
+    .t-cmd { color: rgba(255,255,255,0.85); }
+    .t-key { color: var(--blue); }
+    .t-val { color: var(--orange); }
+    .t-str { color: var(--green); }
+    .t-line { margin-bottom: 4px; }
+
+    /* ── How it works ── */
+    .section {
+      padding: 100px 0;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 500px;
+      margin-bottom: 60px;
+    }
+
+    /* ── Steps ── */
+    .steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .steps { grid-template-columns: 1fr; }
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .step-card:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-2);
+    }
+
+    .step-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      border: 0.5px solid rgba(52,211,153,0.25);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .step-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .step-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ── Features ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .features { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .features { grid-template-columns: 1fr; }
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: var(--border-strong); }
+
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 14px;
+    }
+
+    .feature-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* ── Install section ── */
+    .install-section {
+      padding: 100px 0;
+    }
+
+    .code-block {
+      background: rgba(255,255,255,0.04);
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .code-header {
+      background: rgba(255,255,255,0.04);
+      border-bottom: 0.5px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .code-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .copy-btn {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: none;
+      border: 0.5px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+    .code-body {
+      padding: 20px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.9;
+      overflow-x: auto;
+    }
+
+    .step-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      margin-top: 32px;
+    }
+    .step-label:first-child { margin-top: 0; }
+
+    /* ── AI section ── */
+    .ai-card {
+      background: linear-gradient(135deg, rgba(52,211,153,0.06) 0%, rgba(96,165,250,0.04) 100%);
+      border: 0.5px solid rgba(52,211,153,0.18);
+      border-radius: 20px;
+      padding: 56px;
+      text-align: center;
+    }
+
+    .ai-card h2 {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    .ai-card p {
+      font-size: 17px;
+      color: var(--text-secondary);
+      max-width: 480px;
+      margin: 0 auto 36px;
+      line-height: 1.55;
+    }
+
+    .ai-tags {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+
+    .ai-tag {
+      background: rgba(255,255,255,0.07);
+      border: 0.5px solid var(--border-strong);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* ── Keyboard shortcuts ── */
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 500px) {
+      .shortcuts-grid { grid-template-columns: 1fr; }
+    }
+
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+
+    .shortcut-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .key {
+      background: rgba(255,255,255,0.08);
+      border: 0.5px solid rgba(255,255,255,0.15);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 48px 0;
+      border-top: 0.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: gap;
+      gap: 20px;
+    }
+
+    .footer-logo {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .footer-logo span { color: var(--green); }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .footer-links a {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--text-secondary); }
+
+    /* ── Divider ── */
+    .divider {
+      height: 0.5px;
+      background: var(--border);
+    }
+
+    /* ── Utility ── */
+    .text-green { color: var(--green); }
+    .text-orange { color: var(--orange); }
+    .text-blue { color: var(--blue); }
+    .text-dim { color: var(--text-secondary); }
+
+    /* ── Responsive nav ── */
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      .hero { padding: 130px 0 80px; }
+      .ai-card { padding: 36px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="glow-3"></div>
+
+  <!-- Nav -->
+  <nav>
+    <a href="#" class="logo">opt<span>ate</span></a>
+    <ul class="nav-links">
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="https://github.com/your-username/optate" target="_blank" rel="noopener" class="btn-nav">GitHub ↗</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="badge">⚡ Vite Plugin · Zero Config</div>
+      <h1>
+        Design inspection<br />
+        for your <span class="accent">dev server</span>
+      </h1>
+      <p>
+        Inspect elements, tweak styles, export clean CSS — then paste into your AI chat to apply changes in seconds.
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn-primary">Get Started →</a>
+        <a href="https://github.com/your-username/optate" target="_blank" rel="noopener" class="btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal-wrap">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <span class="terminal-title">vite.config.ts</span>
+          </div>
+          <div class="terminal-body">
+            <div class="t-line t-comment">// Install: npm install optate</div>
+            <div class="t-line">&nbsp;</div>
+            <div class="t-line"><span class="t-key">import</span> <span>{ optate } </span><span class="t-key">from</span> <span class="t-str">'optate/vite'</span></div>
+            <div class="t-line"><span class="t-key">import</span> <span>{ defineConfig } </span><span class="t-key">from</span> <span class="t-str">'vite'</span></div>
+            <div class="t-line">&nbsp;</div>
+            <div class="t-line"><span class="t-key">export default</span> <span>defineConfig({</span></div>
+            <div class="t-line">&nbsp;&nbsp;<span class="t-key">plugins</span><span>: [optate()],</span></div>
+            <div class="t-line"><span>})</span></div>
+            <div class="t-line">&nbsp;</div>
+            <div class="t-line t-comment">// That's it. Open your dev server — Optate loads automatically.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" id="how-it-works">
+    <div class="container">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">Click. Edit. Copy. Ship.</h2>
+      <p class="section-sub">Four steps from design idea to code change — without leaving your browser.</p>
+
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Inspect any element</h3>
+          <p>Click the crosshair to enter inspect mode. Hover to see element info — tag, size, font, color. Click to select and open the editor.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Edit visually</h3>
+          <p>Tweak typography, spacing, colors, borders, and more in the floating editor panel. Changes apply live on the page instantly.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Export clean CSS</h3>
+          <p>Optate tracks every change and exports real CSS — grouped by responsive breakpoint. Desktop, tablet, and mobile changes are automatically separated into <code style="font-size:12px;color:var(--orange)">@media</code> queries.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>Paste into your AI agent</h3>
+          <p>Copy the changes log with full context — element tag, React component name, CSS selector, and values. Paste into Claude, Cursor, or any AI tool and say "apply these."</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Everything you need</h2>
+      <p class="section-sub">Built for the modern AI-assisted development workflow.</p>
+
+      <div class="features">
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <h3>Element Inspector</h3>
+          <p>Click any element to inspect computed styles, dimensions, font details, and computed color values.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✏️</div>
+          <h3>Live Editor</h3>
+          <p>Full style editor with typography, layout, colors, borders, shadows, and transforms — all updated instantly.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💬</div>
+          <h3>Inline Text Edit</h3>
+          <p>Double-click any text element to edit content directly on the page. Changes are tracked and exported.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📐</div>
+          <h3>Gap Measurement</h3>
+          <p>Hover a second element to measure the pixel distance between your selected element and any other.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📱</div>
+          <h3>Responsive Modes</h3>
+          <p>Switch between desktop, tablet, and mobile viewport. Changes are tagged and exported with proper media queries.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⎌</div>
+          <h3>Undo / Redo</h3>
+          <p>Full undo and redo support. Step through every change — keyboard shortcuts <kbd style="font-size:11px;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px">⌘Z</kbd> and <kbd style="font-size:11px;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px">⌘⇧Z</kbd>.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚛️</div>
+          <h3>React Component Names</h3>
+          <p>Automatically detects which React component wraps an element — shown in the export for precise AI context.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📤</div>
+          <h3>CSS Export</h3>
+          <p>One-click export of all changes as valid, formatted CSS — ready to paste into your global stylesheet.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>AI Context Log</h3>
+          <p>A structured change log with element context, selectors, and values. Built to be understood by any AI coding tool.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Install -->
+  <section class="install-section" id="install">
+    <div class="container">
+      <div class="section-label">Installation</div>
+      <h2 class="section-title">Up in 60 seconds</h2>
+      <p class="section-sub">Works with any Vite-based project — React, Vue, Svelte, Solid.</p>
+
+      <div class="step-label">Step 1 — Install</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">Terminal</span>
+          <button class="copy-btn" onclick="copy(this, 'npm install optate')">Copy</button>
+        </div>
+        <div class="code-body">
+          <span class="t-cmd">npm install optate</span>
+        </div>
+      </div>
+
+      <div class="step-label">Step 2 — Add to Vite config</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">vite.config.ts</span>
+          <button class="copy-btn" onclick="copy(this, `import { optate } from 'optate/vite'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({\n  plugins: [optate()],\n})`)">Copy</button>
+        </div>
+        <div class="code-body">
+<span class="t-key">import</span> { optate } <span class="t-key">from</span> <span class="t-str">'optate/vite'</span><br />
+<span class="t-key">import</span> { defineConfig } <span class="t-key">from</span> <span class="t-str">'vite'</span><br />
+<br />
+<span class="t-key">export default</span> defineConfig({<br />
+&nbsp;&nbsp;<span class="t-key">plugins</span>: [<span class="t-val">optate()</span>],<br />
+})
+        </div>
+      </div>
+
+      <div class="step-label">Step 3 — Start your dev server</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">Terminal</span>
+          <button class="copy-btn" onclick="copy(this, 'npm run dev')">Copy</button>
+        </div>
+        <div class="code-body">
+          <span class="t-cmd">npm run dev</span><br />
+          <span class="t-comment"># Optate loads automatically — look for the toolbar in the bottom right</span>
+        </div>
+      </div>
+
+      <div style="margin-top:32px;padding:16px 20px;background:var(--green-dim);border:0.5px solid rgba(52,211,153,0.2);border-radius:var(--radius-sm);">
+        <p style="font-size:14px;color:var(--green);margin:0;">
+          <strong>Dev only.</strong> The Optate toolbar is injected only when <code style="font-size:12px">apply: 'serve'</code> — it never appears in your production build.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Keyboard shortcuts -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">Keyboard Shortcuts</div>
+      <h2 class="section-title">Faster with keys</h2>
+      <p class="section-sub" style="margin-bottom:40px;">Every action has a shortcut.</p>
+
+      <div class="shortcuts-grid">
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Toggle inspect mode</span>
+          <span class="kbd"><span class="key">⌘</span><span class="key">Shift</span><span class="key">I</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Undo last change</span>
+          <span class="kbd"><span class="key">⌘</span><span class="key">Z</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Redo</span>
+          <span class="kbd"><span class="key">⌘</span><span class="key">Shift</span><span class="key">Z</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Deselect element</span>
+          <span class="kbd"><span class="key">Esc</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Inline text edit</span>
+          <span class="kbd"><span class="key">Double-click</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Confirm text edit</span>
+          <span class="kbd"><span class="key">Enter</span> or <span class="key">Blur</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Cancel text edit</span>
+          <span class="kbd"><span class="key">Esc</span></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Show help</span>
+          <span class="kbd"><span class="key">?</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- AI workflow -->
+  <section class="section">
+    <div class="container">
+      <div class="ai-card">
+        <div class="section-label" style="margin-bottom:20px;">AI-First Workflow</div>
+        <h2>Design visually.<br />Apply with AI.</h2>
+        <p>
+          Optate exports changes as a structured context block — element, component, selector, property, old and new value. Paste it into any AI tool and say "apply these changes."
+        </p>
+        <a href="#install" class="btn-primary">Get started for free →</a>
+        <div class="ai-tags">
+          <span class="ai-tag">Claude</span>
+          <span class="ai-tag">Cursor</span>
+          <span class="ai-tag">Copilot</span>
+          <span class="ai-tag">Windsurf</span>
+          <span class="ai-tag">Any AI agent</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+      <a href="#" class="footer-logo">opt<span>ate</span></a>
+      <ul class="footer-links">
+        <li><a href="https://github.com/your-username/optate" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://www.npmjs.com/package/optate" target="_blank" rel="noopener">npm</a></li>
+        <li><a href="#install">Docs</a></li>
+      </ul>
+      <p style="font-size:12px;color:var(--text-tertiary);">MIT License</p>
+    </div>
+  </footer>
+
+  <script>
+    function copy(btn, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = 'var(--green)';
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.style.color = '';
+        }, 1800);
+      });
+    }
+
+    // Smooth scroll offset for fixed nav
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href').slice(1);
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        e.preventDefault();
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>

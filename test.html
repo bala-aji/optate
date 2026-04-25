@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optate Test Page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 80px auto; padding: 0 24px; }
+    h1 { color: #111; }
+    p { color: #555; line-height: 1.6; }
+    .card { background: #f5f5f5; border-radius: 12px; padding: 24px; margin: 16px 0; }
+    button { background: #C75B39; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    img { width: 100%; border-radius: 8px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Optate Test Page</h1>
+  <p>This page tests the Optate npm package injection. The panel should appear automatically at the bottom of the screen.</p>
+  <p>Press <kbd>Alt + Shift + O</kbd> to toggle the panel.</p>
+
+  <div class="card">
+    <h2>Sample Card</h2>
+    <p>Try selecting this text, changing colors, or editing this content with Optate.</p>
+    <button>Click Me</button>
+  </div>
+
+  <div class="card">
+    <h2>Another Section</h2>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Optate lets you inspect and edit any element on this page in real-time.</p>
+  </div>
+
+  <!-- Optate client bundle -->
+  <script src="./dist/client.js" defer></script>
+</body>
+</html>

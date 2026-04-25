@@ -1,0 +1,73 @@
+{
+  "name": "optate",
+  "version": "0.1.0",
+  "description": "Real-time design inspection and editing for your local dev server",
+  "type": "module",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "design",
+    "inspect",
+    "devtools",
+    "css",
+    "react",
+    "ai"
+  ],
+  "author": "Balaganesh R",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/optate.git"
+  },
+  "homepage": "https://optate.dev",
+  "exports": {
+    "./vite": {
+      "import": "./dist/plugin.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build:client": "vite build",
+    "build:plugin": "node build-plugin.mjs",
+    "build": "npm run build:client && npm run build:plugin",
+    "dev:ext": "wxt",
+    "build:ext": "wxt build",
+    "compile": "tsc --project tsconfig.app.json --noEmit",
+    "postinstall": "wxt prepare",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "vite": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": false
+    }
+  },
+  "dependencies": {
+    "animejs": "^4.3.6",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/animejs": "^3.1.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.4.1",
+    "@wxt-dev/module-react": "^1.1.5",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.2",
+    "terser": "^5.46.2",
+    "typescript": "^5.9.3",
+    "vite": "^6.3.3",
+    "wxt": "^0.20.23"
+  }
+}

@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Custom Reset for Optate (inside Shadow DOM) */
+:host {
+  all: initial;
+}
+
+.optate-root {
+  font-family: 'Inter', sans-serif;
+  color: #2D2016; /* earth-espresso */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling for earthy theme */
+.optate-root ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.optate-root ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.optate-root ::-webkit-scrollbar-thumb {
+  background: #A68B7C; /* earth-clay */
+  border-radius: 3px;
+}
+
+.optate-root ::-webkit-scrollbar-thumb:hover {
+  background: #6B8F5E; /* earth-olive */
+}

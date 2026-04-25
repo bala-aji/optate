@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "optate-test",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "5177", "."],
+      "port": 5177
+    },
+    {
+      "name": "landing",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "5178", "landing"],
+      "port": 5178
+    }
+  ]
+}
