@@ -668,20 +668,42 @@ const ChangesContent: React.FC = () => {
             </div>
 
             {/* Property diff */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              {c.type === 'style' && (
-                <code style={{ fontSize: '11px', color: 'rgba(235,235,245,0.45)', fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`, flexShrink: 0 }}>
-                  {c.property}
-                </code>
-              )}
-              <span style={{ fontSize: '12px', color: 'rgba(235,235,245,0.38)', textDecoration: 'line-through' }}>
-                {truncate(c.oldValue, 22)}
-              </span>
-              <span style={{ fontSize: '11px', color: 'rgba(235,235,245,0.3)' }}>→</span>
-              <span style={{ fontSize: '12px', color: 'rgba(52,211,153,0.9)', fontWeight: 500 }}>
-                {truncate(c.newValue, 22)}
-              </span>
-            </div>
+            {c.type === 'html' ? (
+              /* html — show compact text diffs, never raw HTML */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {htmlTextDiff(c.oldValue, c.newValue).slice(0, 3).map((d, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(235,235,245,0.38)', textDecoration: 'line-through' }}>
+                      {truncate(d.was, 22)}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(235,235,245,0.3)' }}>→</span>
+                    <span style={{ fontSize: '12px', color: 'rgba(52,211,153,0.9)', fontWeight: 500 }}>
+                      {truncate(d.now, 22)}
+                    </span>
+                  </div>
+                ))}
+                {htmlTextDiff(c.oldValue, c.newValue).length === 0 && (
+                  <span style={{ fontSize: '11px', color: 'rgba(235,235,245,0.3)', fontStyle: 'italic' }}>
+                    HTML structure modified
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                {c.type === 'style' && (
+                  <code style={{ fontSize: '11px', color: 'rgba(235,235,245,0.45)', fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`, flexShrink: 0 }}>
+                    {c.property}
+                  </code>
+                )}
+                <span style={{ fontSize: '12px', color: 'rgba(235,235,245,0.38)', textDecoration: 'line-through' }}>
+                  {truncate(c.oldValue, 22)}
+                </span>
+                <span style={{ fontSize: '11px', color: 'rgba(235,235,245,0.3)' }}>→</span>
+                <span style={{ fontSize: '12px', color: 'rgba(52,211,153,0.9)', fontWeight: 500 }}>
+                  {truncate(c.newValue, 22)}
+                </span>
+              </div>
+            )}
 
             {/* Selector — tiny, collapsed */}
             {c.selector && (
@@ -799,6 +821,39 @@ function truncate(str: string, len: number) {
   return str.length > len ? str.slice(0, len) + '…' : str;
 }
 
+/** Extract text-node differences between two HTML strings. */
+function htmlTextDiff(before: string, after: string): Array<{ was: string; now: string }> {
+  const extractTexts = (html: string) => {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    const texts: string[] = [];
+    const walker = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const t = node.textContent?.trim();
+      if (t) texts.push(t);
+    }
+    return texts;
+  };
+  const bTexts = extractTexts(before);
+  const aTexts = extractTexts(after);
+  const diffs: Array<{ was: string; now: string }> = [];
+  const len = Math.max(bTexts.length, aTexts.length);
+  for (let i = 0; i < len; i++) {
+    const b = bTexts[i] ?? '';
+    const a = aTexts[i] ?? '';
+    if (b !== a) diffs.push({ was: b, now: a });
+  }
+  return diffs;
+}
+
+/** Human-readable summary of an html-type change. */
+function htmlChangeSummary(c: ReturnType<typeof changeTracker.getChanges>[number]): string {
+  const diffs = htmlTextDiff(c.oldValue, c.newValue);
+  if (diffs.length === 0) return 'HTML structure modified (no text changes detected)';
+  return diffs.map(d => `"${d.was}" → "${d.now}"`).join(', ');
+}
+
 const BREAKPOINTS = {
   desktop: null,
   tablet: '@media (min-width: 481px) and (max-width: 1024px)',
@@ -864,7 +919,12 @@ function buildLogExport(changes: any[]): string {
   return changes.map(c => {
     const chain: string[] = c.componentChain?.length ? c.componentChain : (c.componentName ? [c.componentName] : []);
     const loc = chain.length ? `${chain.join(' › ')} — ` : '';
-    return `/* ${c.type.toUpperCase()} — ${loc}<${c.tagName}> "${c.elementDescription}" */\n/* Before: ${c.oldValue} */\n/* After:  ${c.newValue} */`;
+    const header = `/* ${c.type.toUpperCase()} — ${loc}<${c.tagName}> "${c.elementDescription}" */`;
+    if (c.type === 'html') {
+      const summary = htmlChangeSummary(c);
+      return `${header}\n/* Changes: ${summary} */`;
+    }
+    return `${header}\n/* Before: ${c.oldValue} */\n/* After:  ${c.newValue} */`;
   }).join('\n\n');
 }
 
@@ -889,7 +949,15 @@ function buildJSONExport(changes: ReturnType<typeof changeTracker.getChanges>): 
     }
     const entry = grouped.get(c.selector)!;
     const key = c.type === 'style' ? c.property : c.type;
-    entry.props[key] = [c.oldValue, c.newValue];
+    if (c.type === 'html') {
+      // Never store raw HTML blobs — store the text diffs instead
+      const diffs = htmlTextDiff(c.oldValue, c.newValue);
+      (entry.props as any)[key] = diffs.length
+        ? diffs.map(d => `"${d.was}" → "${d.now}"`)
+        : ['HTML structure modified'];
+    } else {
+      entry.props[key] = [c.oldValue, c.newValue];
+    }
   }
 
   const payload = {
