@@ -17,7 +17,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/optate.git"
+    "url": "https://github.com/bala-aji/optate.git"
   },
   "homepage": "https://optate.dev",
   "bin": {
@@ -29,7 +29,8 @@
     }
   },
   "files": [
-    "dist",
+    "dist/client.js",
+    "dist/plugin.js",
     "bin",
     "README.md"
   ],
@@ -40,7 +41,7 @@
     "dev:ext": "wxt",
     "build:ext": "wxt build",
     "compile": "tsc --project tsconfig.app.json --noEmit",
-    "postinstall": "wxt prepare",
+    "prepare:wxt": "wxt prepare",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
@@ -51,15 +52,14 @@
       "optional": false
     }
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "animejs": "^4.3.6",
     "clsx": "^2.1.1",
     "lucide-react": "^1.8.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwind-merge": "^3.5.0"
-  },
-  "devDependencies": {
+    "tailwind-merge": "^3.5.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/animejs": "^3.1.13",
     "@types/react": "^19.2.14",

@@ -1,0 +1,22 @@
+# Only dist/client.js and dist/plugin.js should ship
+dist/icon
+dist/wxt.svg
+
+# Source and dev files
+src/
+components/
+lib/
+plugins/
+entrypoints/
+popup-backup/
+styles/
+assets/
+public/
+landing/
+.claude/
+*.config.ts
+*.config.js
+tsconfig*.json
+build-plugin.mjs
+test.html
+wxt.config.ts
