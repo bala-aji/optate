@@ -19,7 +19,7 @@
     "type": "git",
     "url": "https://github.com/bala-aji/optate.git"
   },
-  "homepage": "https://optate.dev",
+  "homepage": "https://optate.vercel.app",
   "bin": {
     "optate": "./bin/optate.js"
   },
