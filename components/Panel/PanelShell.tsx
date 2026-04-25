@@ -648,9 +648,15 @@ const ChangesContent: React.FC = () => {
                 bg={TYPE_COLOR[c.type] ?? 'rgba(255,255,255,0.1)'}
                 color={TYPE_TEXT[c.type] ?? '#fff'}
               />
-              {c.componentName && (
-                <Chip label={c.componentName} bg="rgba(168,85,247,0.15)" color="#c084fc" />
-              )}
+              {/* Component breadcrumb chain */}
+              {(c.componentChain?.length ? c.componentChain : c.componentName ? [c.componentName] : []).map((name: string, i: number, arr: string[]) => (
+                <React.Fragment key={name}>
+                  <Chip label={name} bg="rgba(168,85,247,0.15)" color="#c084fc" />
+                  {i < arr.length - 1 && (
+                    <span style={{ fontSize: '9px', color: 'rgba(235,235,245,0.2)', userSelect: 'none' }}>›</span>
+                  )}
+                </React.Fragment>
+              ))}
               <Chip label={`<${c.tagName}>`} bg="rgba(255,255,255,0.07)" color="rgba(235,235,245,0.5)" />
               <Chip
                 label={VP_LABEL[c.viewportMode] ?? c.viewportMode}
@@ -855,25 +861,28 @@ function buildCSSExport(): string {
 
 function buildLogExport(changes: any[]): string {
   if (!changes.length) return '/* No content changes */';
-  return changes.map(c =>
-    `/* ${c.type.toUpperCase()} on ${c.selector} */\n/* Before: ${c.oldValue} */\n/* After:  ${c.newValue} */`
-  ).join('\n\n');
+  return changes.map(c => {
+    const chain: string[] = c.componentChain?.length ? c.componentChain : (c.componentName ? [c.componentName] : []);
+    const loc = chain.length ? `${chain.join(' › ')} — ` : '';
+    return `/* ${c.type.toUpperCase()} — ${loc}<${c.tagName}> "${c.elementDescription}" */\n/* Before: ${c.oldValue} */\n/* After:  ${c.newValue} */`;
+  }).join('\n\n');
 }
 
 function buildJSONExport(changes: ReturnType<typeof changeTracker.getChanges>): string {
-  // Group by selector so all changes to the same element collapse into one entry
+  // Group by selector — all changes to the same element collapse into one entry
   const grouped = new Map<string, {
-    sel: string; el: string; cmp?: string; desc: string; vp: string;
+    component: string; in: string; el: string; sel: string; vp: string;
     props: Record<string, [string, string]>;
   }>();
 
   for (const c of changes) {
     if (!grouped.has(c.selector)) {
+      const chain: string[] = c.componentChain?.length ? c.componentChain : (c.componentName ? [c.componentName] : []);
       grouped.set(c.selector, {
-        sel: c.selector,
+        component: chain[0] ?? c.tagName,
+        in: chain.slice(1).join(' › '),
         el: c.tagName,
-        ...(c.componentName ? { cmp: c.componentName } : {}),
-        desc: c.elementDescription,
+        sel: c.selector,
         vp: c.viewportMode,
         props: {},
       });
@@ -885,7 +894,14 @@ function buildJSONExport(changes: ReturnType<typeof changeTracker.getChanges>): 
 
   const payload = {
     url: window.location.href,
-    changes: Array.from(grouped.values()),
+    changes: Array.from(grouped.values()).map(e => ({
+      component: e.component,
+      ...(e.in ? { in: e.in } : {}),
+      el: e.el,
+      sel: e.sel,
+      vp: e.vp,
+      props: e.props,
+    })),
   };
   return JSON.stringify(payload, null, 2);
 }

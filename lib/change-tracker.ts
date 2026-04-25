@@ -1,6 +1,6 @@
 import { getUniqueSelector } from './dom-utils';
 import { overrideSheet } from './override-sheet';
-import { getReactComponentName } from './react-fiber';
+import { getReactComponentName, getReactComponentChain } from './react-fiber';
 
 export interface ElementChange {
   id: string;
@@ -10,6 +10,7 @@ export interface ElementChange {
   elementName: string;
   elementDescription: string;
   componentName: string | null;
+  componentChain: string[];          // e.g. ['FieldLabel', 'Field', 'LoginPage']
   viewportMode: 'desktop' | 'tablet' | 'mobile';
   type: 'style' | 'text' | 'image' | 'attribute' | 'html';
   property: string;
@@ -70,21 +71,19 @@ class ChangeTracker {
   }
 
   recordChange(
-    element: HTMLElement, 
-    type: ElementChange['type'], 
-    property: string, 
-    oldValue: string, 
+    element: HTMLElement,
+    type: ElementChange['type'],
+    property: string,
+    oldValue: string,
     newValue: string
   ) {
     if (oldValue === newValue) return;
 
     const selector = getUniqueSelector(element);
-    
-    // Add to history for granular undo/redo
-    this.undoStack.push({ type, selector, property, oldValue, newValue });
-    this.redoStack = []; // Clear redo stack on new action
 
-    // Group for the final report
+    this.undoStack.push({ type, selector, property, oldValue, newValue });
+    this.redoStack = [];
+
     const existingIndex = this.changes.findIndex(
       (c) => c.selector === selector && c.type === type && c.property === property
     );
@@ -99,11 +98,11 @@ class ChangeTracker {
       }
     } else {
       const id = element.id;
-      const classes = element.className && typeof element.className === 'string' 
-        ? element.className.split(/\s+/).filter(Boolean) 
+      const classes = element.className && typeof element.className === 'string'
+        ? element.className.split(/\s+/).filter(Boolean)
         : [];
       const elementName = id ? `#${id}` : (classes.length > 0 ? `.${classes[0]}` : element.tagName.toLowerCase());
-      
+
       let elementDescription = '';
       const ariaLabel = element.getAttribute('aria-label') || element.getAttribute('title');
       const textContent = element.textContent?.trim();
@@ -116,6 +115,8 @@ class ChangeTracker {
         elementDescription = element.children.length > 0 ? 'container' : element.tagName.toLowerCase();
       }
 
+      const chain = getReactComponentChain(element);
+
       this.changes.push({
         id: Math.random().toString(36).substr(2, 9),
         timestamp: Date.now(),
@@ -123,7 +124,8 @@ class ChangeTracker {
         tagName: element.tagName.toLowerCase(),
         elementName,
         elementDescription,
-        componentName: getReactComponentName(element),
+        componentName: chain[0] ?? getReactComponentName(element),
+        componentChain: chain,
         viewportMode: this.currentViewportMode,
         type,
         property,
@@ -140,24 +142,16 @@ class ChangeTracker {
   undo() {
     const action = this.undoStack.pop();
     if (!action) return;
-
     this.redoStack.push(action);
     this.applyAction(action, true);
-    
-    // Update the grouped report as well
-    this.syncChangesFromHistory();
     this.notify();
   }
 
   redo() {
     const action = this.redoStack.pop();
     if (!action) return;
-
     this.undoStack.push(action);
     this.applyAction(action, false);
-    
-    // Update the grouped report as well
-    this.syncChangesFromHistory();
     this.notify();
   }
 
@@ -166,7 +160,6 @@ class ChangeTracker {
       const val = isUndo ? action.oldValue : action.newValue;
 
       if (action.type === 'style') {
-        // Route through override-sheet, not el.style
         if (val === '' || val === 'initial') {
           overrideSheet.remove(action.selector, action.property);
         } else {
@@ -188,15 +181,6 @@ class ChangeTracker {
     } catch (err) {
       console.error("Failed to apply undo/redo action:", err);
     }
-  }
-
-  // Recalculates the grouped changes report based on the undo stack
-  private syncChangesFromHistory() {
-    // This is a simplified sync - in a real app we'd maintain the report more carefully
-    // For now, we'll just let the history be the source of truth for the report if needed,
-    // but the report is mainly for the user to copy at the end.
-    // For simplicity, we'll just clear and rebuild a basic version or keep it as is.
-    // Actually, let's just make sure the report reflects the *current* state of the element.
   }
 
   getChanges() {
