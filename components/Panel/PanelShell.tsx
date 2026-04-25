@@ -506,6 +506,31 @@ export const PanelShell: React.FC<PanelShellProps> = ({
 };
 
 /* ─── Changes Content ─── */
+/* ── Type → chip color ── */
+const TYPE_COLOR: Record<string, string> = {
+  style: 'rgba(96,165,250,0.18)',
+  text:  'rgba(52,211,153,0.18)',
+  image: 'rgba(249,115,22,0.18)',
+  html:  'rgba(168,85,247,0.18)',
+};
+const TYPE_TEXT: Record<string, string> = {
+  style: '#60a5fa',
+  text:  '#34d399',
+  image: '#f97316',
+  html:  '#a855f7',
+};
+const VP_LABEL: Record<string, string> = { desktop: '🖥', tablet: '📱', mobile: '📲' };
+
+const Chip: React.FC<{ label: string; bg: string; color: string }> = ({ label, bg, color }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center',
+    padding: '2px 7px', borderRadius: '5px',
+    fontSize: '10px', fontWeight: 600,
+    background: bg, color, letterSpacing: '0.03em',
+    flexShrink: 0,
+  }}>{label}</span>
+);
+
 const ChangesContent: React.FC = () => {
   const [changes, setChanges] = useState(changeTracker.getChanges());
   const [copied, setCopied] = useState(false);
@@ -516,12 +541,10 @@ const ChangesContent: React.FC = () => {
     return changeTracker.subscribe(() => setChanges(changeTracker.getChanges()));
   }, []);
 
-  const styleChanges = changes.filter(c => c.type === 'style');
-  const otherChanges = changes.filter(c => c.type !== 'style');
-
   const getExportText = () => {
+    const other = changes.filter(c => c.type !== 'style');
     if (format === 'json') return buildJSONExport(changes);
-    return buildCSSExport() + (otherChanges.length ? '\n\n' + buildLogExport(otherChanges) : '');
+    return buildCSSExport() + (other.length ? '\n\n' + buildLogExport(other) : '');
   };
 
   const handleCopy = () => {
@@ -547,8 +570,7 @@ const ChangesContent: React.FC = () => {
   const handleDownload = () => {
     const text = getExportText();
     const ext = format === 'json' ? 'json' : 'css';
-    const mime = format === 'json' ? 'application/json' : 'text/plain';
-    const blob = new Blob([text], { type: mime });
+    const blob = new Blob([text], { type: format === 'json' ? 'application/json' : 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `optate-changes.${ext}`;
@@ -571,7 +593,7 @@ const ChangesContent: React.FC = () => {
         padding: '10px 12px', borderBottom: '0.5px solid rgba(255,255,255,0.07)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
       }}>
-        {/* Format toggle — segmented control */}
+        {/* Format toggle */}
         <div style={{
           display: 'flex', background: 'rgba(118,118,128,0.18)', borderRadius: '8px',
           padding: '2px', gap: '1px', flexShrink: 0,
@@ -611,65 +633,64 @@ const ChangesContent: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-        {format === 'json' ? (
-          /* ── JSON view ── */
-          <pre style={{
-            margin: 0, padding: '14px 16px',
-            fontSize: '11px', lineHeight: 1.85,
-            color: 'rgba(235, 245, 255, 0.75)',
-            fontFamily: `'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace`,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-            letterSpacing: '0.01em',
+      {/* Chip cards — always shown regardless of format */}
+      <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '6px' }}>
+        {changes.slice().reverse().map(c => (
+          <div key={c.id} style={{
+            padding: '9px 11px 10px', borderRadius: '11px', marginBottom: '5px',
+            background: 'rgba(255,255,255,0.035)',
+            border: '0.5px solid rgba(255,255,255,0.07)',
           }}>
-            <JSONHighlight text={buildJSONExport(changes)} />
-          </pre>
-        ) : (
-          /* ── CSS view ── */
-          <>
-            {styleChanges.length > 0 && (
-              <pre style={{
-                margin: 0, padding: '14px 16px',
-                fontSize: '11px', lineHeight: 1.8,
-                color: 'rgba(235, 245, 255, 0.7)',
-                fontFamily: `'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace`,
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                letterSpacing: '0.01em',
-                borderBottom: otherChanges.length > 0 ? '0.5px solid rgba(255,255,255,0.06)' : undefined,
-              }}>
-                {buildCSSExport()}
-              </pre>
-            )}
-            {otherChanges.length > 0 && (
-              <div style={{ padding: '6px' }}>
-                {otherChanges.slice().reverse().map(c => (
-                  <div key={c.id} style={{
-                    padding: '9px 12px', borderRadius: '11px', marginBottom: '4px',
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '0.5px solid rgba(255,255,255,0.07)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {c.type}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'rgba(235,235,245,0.28)', letterSpacing: '-0.01em' }}>
-                        {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'rgba(235,235,245,0.6)', marginBottom: '4px', letterSpacing: '-0.01em' }}>
-                      <span style={{ textDecoration: 'line-through', opacity: 0.45 }}>{truncate(c.oldValue, 30)}</span>
-                      <span style={{ color: 'rgba(52,199,89,0.9)', margin: '0 7px' }}>→</span>
-                      <span style={{ color: 'rgba(255,255,255,0.88)' }}>{truncate(c.newValue, 30)}</span>
-                    </div>
-                    <code style={{ fontSize: '10px', color: 'rgba(235,235,245,0.2)', wordBreak: 'break-all', fontFamily: `'SF Mono', ui-monospace, Menlo, monospace` }}>
-                      {c.selector}
-                    </code>
-                  </div>
-                ))}
+            {/* Chips row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <Chip
+                label={c.type.toUpperCase()}
+                bg={TYPE_COLOR[c.type] ?? 'rgba(255,255,255,0.1)'}
+                color={TYPE_TEXT[c.type] ?? '#fff'}
+              />
+              {c.componentName && (
+                <Chip label={c.componentName} bg="rgba(168,85,247,0.15)" color="#c084fc" />
+              )}
+              <Chip label={`<${c.tagName}>`} bg="rgba(255,255,255,0.07)" color="rgba(235,235,245,0.5)" />
+              <Chip
+                label={VP_LABEL[c.viewportMode] ?? c.viewportMode}
+                bg="rgba(255,255,255,0.05)" color="rgba(235,235,245,0.4)"
+              />
+              <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'rgba(235,235,245,0.22)', flexShrink: 0 }}>
+                {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+
+            {/* Property diff */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              {c.type === 'style' && (
+                <code style={{ fontSize: '11px', color: 'rgba(235,235,245,0.45)', fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`, flexShrink: 0 }}>
+                  {c.property}
+                </code>
+              )}
+              <span style={{ fontSize: '12px', color: 'rgba(235,235,245,0.38)', textDecoration: 'line-through' }}>
+                {truncate(c.oldValue, 22)}
+              </span>
+              <span style={{ fontSize: '11px', color: 'rgba(235,235,245,0.3)' }}>→</span>
+              <span style={{ fontSize: '12px', color: 'rgba(52,211,153,0.9)', fontWeight: 500 }}>
+                {truncate(c.newValue, 22)}
+              </span>
+            </div>
+
+            {/* Selector — tiny, collapsed */}
+            {c.selector && (
+              <div style={{ marginTop: '6px' }}>
+                <code style={{
+                  fontSize: '9.5px', color: 'rgba(235,235,245,0.18)',
+                  fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`,
+                  wordBreak: 'break-all', lineHeight: 1.4,
+                }}>
+                  {truncate(c.selector, 60)}
+                </code>
               </div>
             )}
-          </>
-        )}
+          </div>
+        ))}
       </div>
 
       {/* Footer hint */}
@@ -680,17 +701,6 @@ const ChangesContent: React.FC = () => {
       </div>
     </div>
   );
-};
-
-/* Lightweight JSON syntax highlighter */
-const JSONHighlight: React.FC<{ text: string }> = ({ text }) => {
-  const highlighted = text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"(selector|element|component|description|viewport|type|property|from|to|url|generated|changes)":/g,
-      '<span style="color:#60a5fa">"$1"</span>:')
-    .replace(/:\s*"([^"]*)"/g, ': <span style="color:#34d399">"$1"</span>')
-    .replace(/:\s*(\d+)/g, ': <span style="color:#f97316">$1</span>');
-  return <span dangerouslySetInnerHTML={{ __html: highlighted }} />;
 };
 
 /* ─── Help Content ─── */
@@ -851,20 +861,31 @@ function buildLogExport(changes: any[]): string {
 }
 
 function buildJSONExport(changes: ReturnType<typeof changeTracker.getChanges>): string {
+  // Group by selector so all changes to the same element collapse into one entry
+  const grouped = new Map<string, {
+    sel: string; el: string; cmp?: string; desc: string; vp: string;
+    props: Record<string, [string, string]>;
+  }>();
+
+  for (const c of changes) {
+    if (!grouped.has(c.selector)) {
+      grouped.set(c.selector, {
+        sel: c.selector,
+        el: c.tagName,
+        ...(c.componentName ? { cmp: c.componentName } : {}),
+        desc: c.elementDescription,
+        vp: c.viewportMode,
+        props: {},
+      });
+    }
+    const entry = grouped.get(c.selector)!;
+    const key = c.type === 'style' ? c.property : c.type;
+    entry.props[key] = [c.oldValue, c.newValue];
+  }
+
   const payload = {
     url: window.location.href,
-    generated: new Date().toISOString(),
-    changes: changes.map(c => ({
-      selector: c.selector,
-      element: c.tagName,
-      ...(c.componentName ? { component: c.componentName } : {}),
-      description: c.elementDescription,
-      viewport: c.viewportMode,
-      type: c.type,
-      property: c.property,
-      from: c.oldValue,
-      to: c.newValue,
-    })),
+    changes: Array.from(grouped.values()),
   };
   return JSON.stringify(payload, null, 2);
 }
