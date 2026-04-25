@@ -3,6 +3,7 @@ import { useSelection } from '@/lib/selection-context';
 import { applyStyle, getComputedStyleValue, rgbToHex } from '@/lib/css-utils';
 import { changeTracker } from '@/lib/change-tracker';
 import { loadGoogleFont } from '@/lib/dom-utils';
+import { animate, spring, remove, cubicBezier, eases } from 'animejs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,28 @@ const ChevronIcon = ({ rotated }: { rotated: boolean }) => (
 const DeleteIcon = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={13} color="rgba(255,100,100,0.8)" />;
 const FlipIcon = () => <Icon d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" size={13} />;
 const CloseIcon = () => <Icon d="M18 6L6 18M6 6l12 12" size={13} />;
+
+// ─── Align icons ──────────────────────────────────────────────────────────────
+const AlignLeftIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/>
+  </svg>
+);
+const AlignCenterIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+  </svg>
+);
+const AlignRightIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/>
+  </svg>
+);
+const AlignJustifyIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+);
 const LinkIcon = ({ linked }: { linked: boolean }) => (
   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={linked ? T.accent : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round">
     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
@@ -267,7 +290,7 @@ const Row2: React.FC<{ a: FieldDef; b: FieldDef }> = ({ a, b }) => (
 
 // ─── SegmentedControl ─────────────────────────────────────────────────────────
 
-interface SegOption { label: string; value: string }
+interface SegOption { label: React.ReactNode; value: string }
 
 const Segmented: React.FC<{ options: SegOption[]; value: string; onChange: (v: string) => void }> = ({
   options, value, onChange,
@@ -286,6 +309,7 @@ const Segmented: React.FC<{ options: SegOption[]; value: string; onChange: (v: s
           background: value === opt.value ? 'rgba(255,255,255,0.12)' : 'none',
           color: value === opt.value ? T.valueColor : T.labelColor,
           transition: 'background 0.15s, color 0.15s', fontWeight: value === opt.value ? 600 : 400,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         {opt.label}
@@ -472,6 +496,196 @@ const BoxModelWidget: React.FC<{
   );
 };
 
+// ─── Animate types & constants ────────────────────────────────────────────────
+
+interface AnimConfig {
+  opacity: number; scale: number; blur: number;
+  rotate: number; rotateMode: '2d' | '3d'; rotateX: number; rotateY: number;
+  skewX: number; skewY: number; offsetX: number; offsetY: number;
+  duration: number; delay: number; loop: number; infinite: boolean; alternate: boolean;
+  easingType: 'ease' | 'spring' | 'bezier'; easingName: string;
+  springConfig: { mass: number; stiffness: number; damping: number; velocity: number; bounce: number; duration: number };
+  customBezier: string;
+}
+
+const DEFAULT_ANIM_CONFIG: AnimConfig = {
+  opacity: 1, scale: 1, blur: 0, rotate: 0, rotateMode: '2d',
+  rotateX: 0, rotateY: 0, skewX: 0, skewY: 0, offsetX: 0, offsetY: 0,
+  duration: 800, delay: 0, loop: 1, infinite: false, alternate: false,
+  easingType: 'ease', easingName: 'outExpo',
+  springConfig: { mass: 1, stiffness: 100, damping: 10, velocity: 0, bounce: 0, duration: 0 },
+  customBezier: '0.42, 0, 1, 1',
+};
+
+const ANIM_PRESETS_MAP: Record<string, Partial<AnimConfig>> = {
+  'Fade In':     { opacity: 0, duration: 600, easingName: 'outQuad' },
+  'Slide Up':    { offsetY: 30, opacity: 0, duration: 500, easingName: 'outCubic' },
+  'Slide Down':  { offsetY: -30, opacity: 0, duration: 500, easingName: 'outCubic' },
+  'Slide Left':  { offsetX: 40, opacity: 0, duration: 500, easingName: 'outCubic' },
+  'Slide Right': { offsetX: -40, opacity: 0, duration: 500, easingName: 'outCubic' },
+  'Zoom In':     { scale: 0.8, opacity: 0, duration: 500, easingName: 'outBack' },
+  'Zoom Out':    { scale: 1.2, opacity: 0, duration: 500, easingName: 'outCubic' },
+  'Bounce In':   { scale: 0, easingType: 'spring', springConfig: { mass: 1, stiffness: 100, damping: 10, velocity: 0, bounce: 0.65, duration: 628 } } as Partial<AnimConfig>,
+  'Flip X':      { rotateMode: '3d', rotateX: 90, duration: 700, easingName: 'outExpo' },
+  'Flip Y':      { rotateMode: '3d', rotateY: 90, duration: 700, easingName: 'outExpo' },
+  'Blur Reveal': { blur: 12, opacity: 0, duration: 800, easingName: 'outExpo' },
+  'Rotate In':   { rotate: -180, opacity: 0, scale: 0.5, duration: 600, easingName: 'outBack' },
+};
+
+const EASING_CATEGORIES: Record<string, string[]> = {
+  'Standard': ['linear', 'in', 'out', 'inOut'],
+  'Quad': ['inQuad', 'outQuad', 'inOutQuad'],
+  'Cubic': ['inCubic', 'outCubic', 'inOutCubic'],
+  'Quart': ['inQuart', 'outQuart', 'inOutQuart'],
+  'Expo': ['inExpo', 'outExpo', 'inOutExpo'],
+  'Sine': ['inSine', 'outSine', 'inOutSine'],
+  'Back': ['inBack', 'outBack', 'inOutBack'],
+  'Elastic': ['inElastic', 'outElastic', 'inOutElastic'],
+  'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
+};
+
+// ─── Animate sub-components ───────────────────────────────────────────────────
+
+const AnimSlider: React.FC<{ label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }> = ({ label, value, min, max, step = 1, unit = '', onChange }) => (
+  <div style={{ marginBottom: 8 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'Inter, system-ui, sans-serif' }}>{label}</span>
+      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>{value}{unit}</span>
+    </div>
+    <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))}
+      style={{ width: '100%', accentColor: '#34d399' }} />
+  </div>
+);
+
+const AnimDualAxis: React.FC<{ label: string; x: number; y: number; onX: (v: number) => void; onY: (v: number) => void }> = ({ label, x, y, onX, onY }) => (
+  <div style={{ marginBottom: 8 }}>
+    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'Inter, system-ui, sans-serif', display: 'block', marginBottom: 4 }}>{label}</span>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+      <div>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>X: {x}</span>
+        <input type="range" min={-200} max={200} value={x} onChange={e => onX(parseInt(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6' }} />
+      </div>
+      <div>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>Y: {y}</span>
+        <input type="range" min={-200} max={200} value={y} onChange={e => onY(parseInt(e.target.value))} style={{ width: '100%', accentColor: '#3b82f6' }} />
+      </div>
+    </div>
+  </div>
+);
+
+const MiniPreview: React.FC<{ el: HTMLElement; config: AnimConfig; buildParams: (el: HTMLElement, cfg: AnimConfig) => Record<string, any> }> = ({ el, config, buildParams }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const isText = ['h1','h2','h3','h4','h5','h6','p','span','a','button','label','li'].includes(el.tagName.toLowerCase());
+  const onEnter = () => {
+    const node = ref.current;
+    if (!node) return;
+    try { remove(node); } catch {}
+    node.style.transform = ''; node.style.opacity = '1'; node.style.filter = '';
+    try { animate(node, { ...buildParams(node, config), loop: false }); } catch {}
+  };
+  const onLeave = () => {
+    const node = ref.current;
+    if (!node) return;
+    try { remove(node); } catch {}
+    node.style.transform = ''; node.style.opacity = '1'; node.style.filter = '';
+  };
+  return (
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 90, cursor: 'pointer', position: 'relative', marginBottom: 10 }}>
+      <div style={{ position: 'absolute', top: 7, right: 8, fontSize: 8, color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Hover to preview</div>
+      <div ref={ref} style={{ willChange: 'transform, opacity, filter' }}>
+        {isText
+          ? <div style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit' }}>Hello</div>
+          : <div style={{ width: 72, height: 52, borderRadius: 8, background: 'linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3))', border: '0.5px solid rgba(255,255,255,0.1)' }} />
+        }
+      </div>
+    </div>
+  );
+};
+
+const EasingCurvePreview: React.FC<{ config: AnimConfig; onBezierChange: (b: string) => void }> = ({ config, onBezierChange }) => {
+  const ballRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState<'p1' | 'p2' | null>(null);
+  const W = 220, H = 140, PAD = 20;
+  const graphW = W - PAD * 2, graphH = H - PAD * 2;
+  const startX = PAD, startY = H - PAD, endX = PAD + graphW, endY = PAD;
+  const parseBezier = (): [number,number,number,number] => {
+    try {
+      const v = config.customBezier.split(',').map(n => parseFloat(n.trim()));
+      if (v.length === 4 && v.every(n => !isNaN(n))) return v as [number,number,number,number];
+    } catch {}
+    return [0.42, 0, 0.58, 1];
+  };
+  const [x1, y1, x2, y2] = parseBezier();
+  const toSvgX = (v: number) => PAD + v * graphW;
+  const toSvgY = (v: number) => (H - PAD) - v * graphH;
+  const fromSvgX = (sx: number) => Math.max(0, Math.min(1, (sx - PAD) / graphW));
+  const fromSvgY = (sy: number) => (H - PAD - sy) / graphH;
+  const cp1x = toSvgX(x1), cp1y = toSvgY(y1), cp2x = toSvgX(x2), cp2y = toSvgY(y2);
+  const isBezier = config.easingType === 'bezier';
+  const getEaseFn = () => { try { if (config.easingType === 'ease') { const fn = (eases as any)[config.easingName]; if (typeof fn === 'function') { try { const r = fn(); return typeof r === 'function' ? r : fn; } catch { return fn; } } } } catch {} return null; };
+  const curvePath = isBezier
+    ? `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`
+    : (() => { const fn = getEaseFn(); const pts: string[] = []; for (let i = 0; i <= 60; i++) { const t = i/60; let v = t; try { if (fn) v = fn(t); } catch {} const cv = Math.max(-0.3, Math.min(1.3, v)); pts.push(`${(PAD + t*graphW).toFixed(1)},${((H-PAD) - cv*graphH).toFixed(1)}`); } return `M ${pts[0]} L ${pts.slice(1).join(' L ')}`; })();
+  const getSvgPt = (e: MouseEvent) => { const svg = svgRef.current; if (!svg) return {x:0,y:0}; const r = svg.getBoundingClientRect(); return { x: (e.clientX-r.left)*(W/r.width), y: (e.clientY-r.top)*(H/r.height) }; };
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: MouseEvent) => { const pt = getSvgPt(e); const bx = Math.round(Math.max(0,Math.min(1,fromSvgX(pt.x)))*100)/100; const by = Math.round(Math.max(-0.5,Math.min(1.5,fromSvgY(pt.y)))*100)/100; if (dragging==='p1') onBezierChange(`${bx},${by},${x2},${y2}`); else onBezierChange(`${x1},${y1},${bx},${by}`); };
+    const up = () => setDragging(null);
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  }, [dragging, x1, y1, x2, y2]);
+  const onHover = () => { const ball = ballRef.current; if (!ball || dragging) return; try { remove(ball); } catch {} ball.style.transform = 'translateX(0)'; const p: Record<string,any> = { translateX: [0, graphW], duration: Math.min(config.duration, 2000) }; if (config.easingType === 'spring') { p.ease = spring(config.springConfig); } else if (config.easingType === 'bezier') { try { const v = config.customBezier.split(',').map(Number); if (v.length===4) p.ease = cubicBezier(v[0],v[1],v[2],v[3]); } catch {} } else { p.ease = config.easingName; } p.onComplete = () => { setTimeout(() => { if (ball) ball.style.transform = 'translateX(0)'; }, 300); }; try { animate(ball, p); } catch {}; };
+  const onLeave = () => { const ball = ballRef.current; if (!ball) return; try { remove(ball); } catch {} ball.style.transform = 'translateX(0)'; };
+  return (
+    <div onMouseEnter={onHover} onMouseLeave={onLeave} style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '6px 0 0', position: 'relative', marginBottom: 8 }}>
+      <div style={{ position: 'absolute', top: 6, right: 8, fontSize: 7, color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isBezier ? 'Drag handles' : 'Hover to play'}</div>
+      <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block', userSelect: 'none' }}>
+        <line x1={PAD} y1={H-PAD} x2={PAD+graphW} y2={H-PAD} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+        <line x1={PAD} y1={H-PAD} x2={PAD} y2={PAD} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+        <line x1={PAD} y1={H-PAD} x2={PAD+graphW} y2={PAD} stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4,4" />
+        <path d={curvePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+        {isBezier ? (<>
+          <line x1={startX} y1={startY} x2={cp1x} y2={cp1y} stroke="#3b82f6" strokeWidth="1.5" />
+          <line x1={endX} y1={endY} x2={cp2x} y2={cp2y} stroke="#3b82f6" strokeWidth="1.5" />
+          <circle cx={startX} cy={startY} r="4" fill="rgba(255,255,255,0.2)" />
+          <circle cx={endX} cy={endY} r="4" fill="rgba(255,255,255,0.2)" />
+          <circle cx={cp1x} cy={cp1y} r="7" fill="#3b82f6" stroke="#fff" strokeWidth="1.5" style={{ cursor: 'grab' }} onMouseDown={e => { e.preventDefault(); setDragging('p1'); }} />
+          <circle cx={cp2x} cy={cp2y} r="7" fill="#3b82f6" stroke="#fff" strokeWidth="1.5" style={{ cursor: 'grab' }} onMouseDown={e => { e.preventDefault(); setDragging('p2'); }} />
+        </>) : (<>
+          <circle cx={PAD} cy={H-PAD} r="3.5" fill="#3b82f6" opacity="0.8" />
+          <circle cx={PAD+graphW} cy={PAD} r="3.5" fill="rgba(255,255,255,0.3)" />
+        </>)}
+      </svg>
+      <div style={{ padding: '4px 14px 8px', position: 'relative' }}>
+        <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, position: 'relative' }}>
+          <div ref={ballRef} style={{ position: 'absolute', top: -4, left: -5, width: 10, height: 10, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', willChange: 'transform' }} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AnimTabBar: React.FC<{ animTab: 'transition' | 'keyframe'; setAnimTab: (t: 'transition' | 'keyframe') => void }> = ({ animTab, setAnimTab }) => (
+  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 3, gap: 2 }}>
+    {(['transition', 'keyframe'] as const).map(tab => (
+      <button
+        key={tab}
+        onClick={() => setAnimTab(tab)}
+        style={{
+          flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
+          fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500,
+          transition: 'all 0.15s',
+          background: animTab === tab ? 'rgba(255,255,255,0.10)' : 'transparent',
+          color: animTab === tab ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
+        }}
+      >
+        {tab === 'transition' ? '⚡ Transition' : '🎬 Keyframe'}
+      </button>
+    ))}
+  </div>
+);
+
 // ─── Main EditorPanel ────────────────────────────────────────────────────────
 
 export const EditorPanel: React.FC = () => {
@@ -548,6 +762,38 @@ export const EditorPanel: React.FC = () => {
   const [scaleX, setScaleX] = useState('1');
   const [translateX, setTranslateX] = useState('0');
   const [translateY, setTranslateY] = useState('0');
+
+  // Animate – tab
+  const [animTab, setAnimTab] = useState<'transition' | 'keyframe'>('keyframe');
+
+  // Animate – transition (CSS)
+  const [transProp, setTransProp] = useState('all');
+  const [transDuration, setTransDuration] = useState('300');
+  const [transEasing, setTransEasing] = useState('ease');
+  const [transDelay, setTransDelay] = useState('0');
+
+  // Animate – animejs config
+  const [animConfig, setAnimConfig] = useState<AnimConfig>({
+    opacity: 1, scale: 1, blur: 0, rotate: 0, rotateMode: '2d',
+    rotateX: 0, rotateY: 0, skewX: 0, skewY: 0, offsetX: 0, offsetY: 0,
+    duration: 800, delay: 0, loop: 1, infinite: false, alternate: false,
+    easingType: 'ease', easingName: 'outExpo',
+    springConfig: { mass: 1, stiffness: 100, damping: 10, velocity: 0, bounce: 0, duration: 0 },
+    customBezier: '0.42, 0, 1, 1',
+  });
+  const [animSelectedPreset, setAnimSelectedPreset] = useState('');
+  const [animIsPreviewing, setAnimIsPreviewing] = useState(false);
+  const animPreviewRef = useRef<any>(null);
+  const animOriginalStyles = useRef<Record<string, string>>({});
+  const miniPreviewRef = useRef<HTMLDivElement>(null);
+
+  // ── Inject keyframes once ────────────────────────────────────────────────
+  useEffect(() => {
+    if (document.getElementById('optate-anim-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'optate-anim-styles';
+    document.head.appendChild(style);
+  }, []);
 
   // ── Read computed styles on element change ────────────────────────────────
 
@@ -626,6 +872,19 @@ export const EditorPanel: React.FC = () => {
     setFilterBlur(fBlurM ? fBlurM[1] : '0');
     setBlendMode(cs.mixBlendMode || 'normal');
 
+    // Animate – transition
+    const tr = el.style.transition || cs.transition || '';
+    if (tr && tr !== 'all 0s ease 0s') {
+      const trMatch = tr.match(/(\S+)\s+([\d.]+)s\s+(\S+)(?:\s+([\d.]+)s)?/);
+      if (trMatch) {
+        setTransProp(trMatch[1] || 'all');
+        setTransDuration(Math.round((parseFloat(trMatch[2]) || 0.3) * 1000).toString());
+        setTransEasing(trMatch[3] || 'ease');
+        setTransDelay(Math.round((parseFloat(trMatch[4] || '0')) * 1000).toString());
+      }
+    } else {
+      setTransProp('all'); setTransDuration('300'); setTransEasing('ease'); setTransDelay('0');
+    }
     // Transform
     const transform = cs.transform || 'none';
     if (transform !== 'none') {
@@ -745,6 +1004,123 @@ export const EditorPanel: React.FC = () => {
   const handleScaleX = (v: string) => { setScaleX(v); applyProp('transform', buildTransform(undefined, v)); };
   const handleTranslateX = (v: string) => { setTranslateX(v.replace('px', '')); applyProp('transform', buildTransform(undefined, undefined, v.replace('px', ''))); };
   const handleTranslateY = (v: string) => { setTranslateY(v.replace('px', '')); applyProp('transform', buildTransform(undefined, undefined, undefined, v.replace('px', ''))); };
+
+  // ── Animate – CSS transition handlers ─────────────────────────────────────
+  const applyTransition = (prop = transProp, dur = transDuration, eas = transEasing, del = transDelay) => {
+    if (!el) return;
+    const val = `${prop} ${parseFloat(dur) / 1000}s ${eas} ${parseFloat(del) / 1000}s`;
+    const old = el.style.transition || '';
+    el.style.transition = val;
+    changeTracker.recordChange(el, 'style', 'transition', old, val);
+  };
+  const handleTransProp = (v: string) => { setTransProp(v); applyTransition(v); };
+  const handleTransDuration = (v: string) => { const n = v.replace('ms',''); setTransDuration(n); applyTransition(transProp, n); };
+  const handleTransEasing = (v: string) => { setTransEasing(v); applyTransition(transProp, transDuration, v); };
+  const handleTransDelay = (v: string) => { const n = v.replace('ms',''); setTransDelay(n); applyTransition(transProp, transDuration, transEasing, n); };
+
+  // ── Animate – animejs helpers ─────────────────────────────────────────────
+  const updateAnimConfig = (updates: Partial<AnimConfig>) => {
+    setAnimConfig(prev => ({ ...prev, ...updates }));
+    setAnimSelectedPreset('');
+  };
+
+  const applyPreset = (name: string) => {
+    const preset = ANIM_PRESETS_MAP[name];
+    if (preset) {
+      setAnimConfig(prev => ({ ...DEFAULT_ANIM_CONFIG, ...preset }));
+      setAnimSelectedPreset(name);
+    }
+  };
+
+  const buildAnimeParams = useCallback((targetEl: HTMLElement, cfg: AnimConfig): Record<string, any> => {
+    const params: Record<string, any> = {};
+    if (cfg.opacity !== 1) params.opacity = [cfg.opacity, 1];
+    if (cfg.scale !== 1) params.scale = [cfg.scale, 1];
+    if (cfg.blur !== 0) params.filter = [`blur(${cfg.blur}px)`, 'blur(0px)'];
+    if (cfg.offsetX !== 0) params.translateX = [cfg.offsetX, 0];
+    if (cfg.offsetY !== 0) params.translateY = [cfg.offsetY, 0];
+    if (cfg.rotate !== 0) params.rotate = [`${cfg.rotate}deg`, '0deg'];
+    if (cfg.rotateMode === '3d') {
+      if (cfg.rotateX !== 0) params.rotateX = [`${cfg.rotateX}deg`, '0deg'];
+      if (cfg.rotateY !== 0) params.rotateY = [`${cfg.rotateY}deg`, '0deg'];
+    }
+    if (cfg.skewX !== 0) params.skewX = [`${cfg.skewX}deg`, '0deg'];
+    if (cfg.skewY !== 0) params.skewY = [`${cfg.skewY}deg`, '0deg'];
+    if (Object.keys(params).length === 0) params.opacity = [0, 1];
+    params.duration = cfg.duration;
+    params.delay = cfg.delay;
+    params.loop = cfg.infinite ? true : cfg.loop;
+    params.alternate = cfg.alternate;
+    if (cfg.easingType === 'spring') {
+      params.ease = spring(cfg.springConfig);
+    } else if (cfg.easingType === 'bezier') {
+      try {
+        const vals = cfg.customBezier.split(',').map(n => parseFloat(n.trim()));
+        if (vals.length === 4 && vals.every(v => !isNaN(v))) params.ease = cubicBezier(vals[0], vals[1], vals[2], vals[3]);
+        else params.ease = 'outExpo';
+      } catch { params.ease = 'outExpo'; }
+    } else {
+      params.ease = cfg.easingName;
+    }
+    return params;
+  }, []);
+
+  const runAnimPreview = () => {
+    if (!el) return;
+    if (animIsPreviewing) {
+      try { if (animPreviewRef.current) { remove(el); animPreviewRef.current = null; } } catch {}
+      Object.entries(animOriginalStyles.current).forEach(([p, v]) => { (el.style as any)[p] = v; });
+      setAnimIsPreviewing(false);
+      return;
+    }
+    animOriginalStyles.current = { transform: el.style.transform, opacity: el.style.opacity, filter: el.style.filter };
+    setAnimIsPreviewing(true);
+    const params = buildAnimeParams(el, animConfig);
+    params.onComplete = () => {
+      if (!animConfig.infinite && animConfig.loop <= 1) setAnimIsPreviewing(false);
+    };
+    try { animPreviewRef.current = animate(el, params); } catch { setAnimIsPreviewing(false); }
+  };
+
+  const handleApplyAnimation = () => {
+    if (!el) return;
+    if (animIsPreviewing) { try { remove(el); } catch {} setAnimIsPreviewing(false); }
+    const cfg = animConfig;
+    const fromProps: string[] = []; const toProps: string[] = []; const tfFrom: string[] = [];
+    if (cfg.opacity !== 1) { fromProps.push(`opacity: ${cfg.opacity}`); toProps.push('opacity: 1'); }
+    if (cfg.blur !== 0) { fromProps.push(`filter: blur(${cfg.blur}px)`); toProps.push('filter: blur(0px)'); }
+    if (cfg.scale !== 1) tfFrom.push(`scale(${cfg.scale})`);
+    if (cfg.offsetX !== 0) tfFrom.push(`translateX(${cfg.offsetX}px)`);
+    if (cfg.offsetY !== 0) tfFrom.push(`translateY(${cfg.offsetY}px)`);
+    if (cfg.rotate !== 0) tfFrom.push(`rotate(${cfg.rotate}deg)`);
+    if (cfg.rotateMode === '3d') {
+      if (cfg.rotateX !== 0) tfFrom.push(`rotateX(${cfg.rotateX}deg)`);
+      if (cfg.rotateY !== 0) tfFrom.push(`rotateY(${cfg.rotateY}deg)`);
+    }
+    if (cfg.skewX !== 0) tfFrom.push(`skewX(${cfg.skewX}deg)`);
+    if (cfg.skewY !== 0) tfFrom.push(`skewY(${cfg.skewY}deg)`);
+    if (tfFrom.length > 0) { fromProps.push(`transform: ${tfFrom.join(' ')}`); toProps.push('transform: none'); }
+    if (fromProps.length === 0) { fromProps.push('opacity: 0'); toProps.push('opacity: 1'); }
+
+    const animId = `optate-anim-${Date.now()}`;
+    const kf = `@keyframes ${animId} { from { ${fromProps.join('; ')}; } to { ${toProps.join('; ')}; } }`;
+    let styleEl = document.getElementById('optate-anim-styles') as HTMLStyleElement;
+    if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = 'optate-anim-styles'; document.head.appendChild(styleEl); }
+    styleEl.textContent += '\n' + kf;
+
+    let cssEasing = 'ease';
+    if (cfg.easingType === 'bezier') cssEasing = `cubic-bezier(${cfg.customBezier})`;
+    else if (cfg.easingName.includes('In') && !cfg.easingName.includes('Out')) cssEasing = 'ease-in';
+    else if (cfg.easingName.includes('Out') && !cfg.easingName.includes('In')) cssEasing = 'ease-out';
+    else cssEasing = 'ease-in-out';
+
+    const iterationCount = cfg.infinite ? 'infinite' : String(cfg.loop);
+    const direction = cfg.alternate ? 'alternate' : 'normal';
+    const animValue = `${animId} ${cfg.duration}ms ${cssEasing} ${cfg.delay}ms ${iterationCount} ${direction} both`;
+    const oldAnim = el.style.animation;
+    el.style.animation = animValue;
+    changeTracker.recordChange(el, 'style', 'animation', oldAnim || 'none', animValue);
+  };
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -1007,10 +1383,10 @@ export const EditorPanel: React.FC = () => {
               value={textAlign}
               onChange={handleTextAlign}
               options={[
-                { label: '⬛ L', value: 'left' },
-                { label: '— C', value: 'center' },
-                { label: 'R ⬛', value: 'right' },
-                { label: '= J', value: 'justify' },
+                { label: <AlignLeftIcon />, value: 'left' },
+                { label: <AlignCenterIcon />, value: 'center' },
+                { label: <AlignRightIcon />, value: 'right' },
+                { label: <AlignJustifyIcon />, value: 'justify' },
               ]}
             />
           </div>
@@ -1115,6 +1491,197 @@ export const EditorPanel: React.FC = () => {
             a={{ label: 'Trans X', value: translateX, unit: 'px', onChange: handleTranslateX }}
             b={{ label: 'Trans Y', value: translateY, unit: 'px', onChange: handleTranslateY }}
           />
+        </Section>
+
+        {/* ─ Section 9: Animate ─ */}
+        <Section title="Animate" defaultOpen={false}>
+
+          {/* ── Tab switcher: Transition vs Keyframe ── */}
+          <AnimTabBar animTab={animTab} setAnimTab={setAnimTab} />
+
+          {animTab === 'transition' ? (
+            /* ════════════ TRANSITION TAB ════════════ */
+            <div style={{ marginTop: 10 }}>
+              <div style={{ marginBottom: 8 }}>
+                <FieldLabel>Property</FieldLabel>
+                <SmallSelect
+                  value={transProp}
+                  onChange={handleTransProp}
+                  options={['all', 'opacity', 'transform', 'background-color', 'color', 'border-color', 'width', 'height', 'box-shadow', 'filter']}
+                />
+              </div>
+              <Row2
+                a={{ label: 'Duration', value: transDuration, unit: 'ms', onChange: handleTransDuration }}
+                b={{ label: 'Delay', value: transDelay, unit: 'ms', onChange: handleTransDelay }}
+              />
+              <Segmented
+                value={transEasing}
+                onChange={handleTransEasing}
+                options={[{ label: 'ease', value: 'ease' }, { label: 'linear', value: 'linear' }, { label: 'ease-in', value: 'ease-in' }, { label: 'ease-out', value: 'ease-out' }]}
+              />
+              <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(52,211,153,0.06)', borderRadius: 7, border: '0.5px solid rgba(52,211,153,0.15)' }}>
+                <div style={{ fontSize: 9, color: 'rgba(52,211,153,0.6)', fontFamily: T.font, lineHeight: 1.5 }}>
+                  Applied live — hover or interact with the element to see it.
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ════════════ KEYFRAME TAB ════════════ */
+            <div style={{ marginTop: 10 }}>
+
+              {/* Mini preview — compact */}
+              <MiniPreview el={el} config={animConfig} buildParams={buildAnimeParams} />
+
+              {/* Preset */}
+              <div style={{ marginBottom: 12 }}>
+                <FieldLabel>Preset</FieldLabel>
+                <select
+                  value={animSelectedPreset}
+                  onChange={e => { const v = e.target.value; setAnimSelectedPreset(v); if (v) applyPreset(v); }}
+                  style={{
+                    width: '100%', background: T.inputBg, border: T.inputBorder, borderRadius: 6,
+                    padding: '6px 8px', fontSize: 11, color: T.valueColor, outline: 'none',
+                    cursor: 'pointer', fontFamily: T.font, marginTop: 4,
+                  }}
+                >
+                  <option value="" style={{ background: '#1a1a1a', color: 'rgba(255,255,255,0.4)' }}>Custom</option>
+                  {Object.keys(ANIM_PRESETS_MAP).map(name => (
+                    <option key={name} value={name} style={{ background: '#1a1a1a', color: '#fff' }}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* From State */}
+              <div style={{ fontSize: 10, color: T.labelColor, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                From state <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, textTransform: 'none', letterSpacing: 0 }}>(animates to current)</span>
+              </div>
+              <AnimSlider label="Opacity" value={animConfig.opacity} min={0} max={1} step={0.01} onChange={v => updateAnimConfig({ opacity: v })} />
+              <AnimSlider label="Scale" value={animConfig.scale} min={0} max={3} step={0.05} onChange={v => updateAnimConfig({ scale: v })} />
+              <AnimSlider label="Blur" value={animConfig.blur} min={0} max={20} unit="px" onChange={v => updateAnimConfig({ blur: v })} />
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font }}>Rotate</span>
+                  <Segmented
+                    value={animConfig.rotateMode === '2d' ? '2d' : '3d'}
+                    onChange={v => updateAnimConfig({ rotateMode: v as '2d' | '3d' })}
+                    options={[{ label: '2D', value: '2d' }, { label: '3D', value: '3d' }]}
+                  />
+                </div>
+                {animConfig.rotateMode === '2d' ? (
+                  <AnimSlider label="Rotation" value={animConfig.rotate} min={-360} max={360} unit="°" onChange={v => updateAnimConfig({ rotate: v })} />
+                ) : (
+                  <div style={{ paddingLeft: 8, borderLeft: '2px solid rgba(59,130,246,0.15)' }}>
+                    <AnimSlider label="X" value={animConfig.rotateX} min={-360} max={360} unit="°" onChange={v => updateAnimConfig({ rotateX: v })} />
+                    <AnimSlider label="Y" value={animConfig.rotateY} min={-360} max={360} unit="°" onChange={v => updateAnimConfig({ rotateY: v })} />
+                    <AnimSlider label="Z" value={animConfig.rotate} min={-360} max={360} unit="°" onChange={v => updateAnimConfig({ rotate: v })} />
+                  </div>
+                )}
+              </div>
+              <AnimDualAxis label="Offset" x={animConfig.offsetX} y={animConfig.offsetY} onX={v => updateAnimConfig({ offsetX: v })} onY={v => updateAnimConfig({ offsetY: v })} />
+              <AnimDualAxis label="Skew" x={animConfig.skewX} y={animConfig.skewY} onX={v => updateAnimConfig({ skewX: v })} onY={v => updateAnimConfig({ skewY: v })} />
+
+              {/* Easing */}
+              <div style={{ fontSize: 10, color: T.labelColor, letterSpacing: '0.06em', textTransform: 'uppercase', margin: '12px 0 8px' }}>Easing</div>
+              <div style={{ marginBottom: 8 }}>
+                <Segmented
+                  value={animConfig.easingType}
+                  onChange={v => updateAnimConfig({ easingType: v as 'ease' | 'spring' | 'bezier' })}
+                  options={[{ label: 'Ease', value: 'ease' }, { label: 'Spring', value: 'spring' }, { label: 'Bezier', value: 'bezier' }]}
+                />
+              </div>
+              {animConfig.easingType === 'ease' && (
+                <select
+                  value={animConfig.easingName}
+                  onChange={e => updateAnimConfig({ easingName: e.target.value })}
+                  style={{ width: '100%', background: T.inputBg, border: T.inputBorder, borderRadius: 6, padding: '6px 8px', fontSize: 11, color: T.valueColor, outline: 'none', cursor: 'pointer', fontFamily: T.font, marginBottom: 6 }}
+                >
+                  {Object.entries(EASING_CATEGORIES).map(([cat, easings]) => (
+                    <optgroup key={cat} label={cat} style={{ background: '#1a1a1a' }}>
+                      {easings.map(e => <option key={e} value={e} style={{ background: '#1a1a1a', color: '#fff' }}>{e}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
+              {animConfig.easingType === 'spring' && (
+                <div style={{ marginBottom: 6 }}>
+                  <AnimSlider label="Mass" value={animConfig.springConfig.mass} min={0.1} max={10} step={0.1} onChange={v => updateAnimConfig({ springConfig: { ...animConfig.springConfig, mass: v } })} />
+                  <AnimSlider label="Stiffness" value={animConfig.springConfig.stiffness} min={1} max={1000} step={10} onChange={v => updateAnimConfig({ springConfig: { ...animConfig.springConfig, stiffness: v } })} />
+                  <AnimSlider label="Damping" value={animConfig.springConfig.damping} min={1} max={100} onChange={v => updateAnimConfig({ springConfig: { ...animConfig.springConfig, damping: v } })} />
+                  <AnimSlider label="Bounce" value={animConfig.springConfig.bounce} min={0} max={1} step={0.01} onChange={v => updateAnimConfig({ springConfig: { ...animConfig.springConfig, bounce: v } })} />
+                </div>
+              )}
+              {/* Curve always visible for bezier, optional for others */}
+              {animConfig.easingType === 'bezier' && (
+                <>
+                  <EasingCurvePreview config={animConfig} onBezierChange={b => updateAnimConfig({ customBezier: b })} />
+                  <input
+                    value={animConfig.customBezier}
+                    onChange={e => updateAnimConfig({ customBezier: e.target.value })}
+                    placeholder="0.42, 0, 1, 1"
+                    style={{ width: '100%', boxSizing: 'border-box', background: T.inputBg, border: T.inputBorder, borderRadius: 6, padding: '6px 8px', fontSize: 11, color: T.valueColor, outline: 'none', fontFamily: 'monospace', marginTop: 6 }}
+                  />
+                </>
+              )}
+              {animConfig.easingType !== 'bezier' && (
+                <EasingCurvePreview config={animConfig} onBezierChange={b => updateAnimConfig({ customBezier: b })} />
+              )}
+
+              {/* Duration + Delay */}
+              <div style={{ fontSize: 10, color: T.labelColor, letterSpacing: '0.06em', textTransform: 'uppercase', margin: '12px 0 8px' }}>Timing</div>
+              <AnimSlider label="Duration" value={animConfig.duration} min={100} max={5000} step={50} unit="ms" onChange={v => updateAnimConfig({ duration: v })} />
+              <AnimSlider label="Delay" value={animConfig.delay} min={0} max={5000} step={50} unit="ms" onChange={v => updateAnimConfig({ delay: v })} />
+
+              {/* Loop + Alternate inline */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, flex: 1 }}>Loop</span>
+                <button
+                  onClick={() => updateAnimConfig({ infinite: !animConfig.infinite })}
+                  style={{ padding: '3px 8px', borderRadius: 5, fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: T.font, background: animConfig.infinite ? 'rgba(59,130,246,0.18)' : T.inputBg, color: animConfig.infinite ? '#60a5fa' : T.labelColor }}
+                >∞</button>
+                {!animConfig.infinite && (
+                  <div style={{ display: 'flex', alignItems: 'center', background: T.inputBg, borderRadius: 5, border: T.inputBorder, overflow: 'hidden' }}>
+                    <button onClick={() => updateAnimConfig({ loop: Math.max(1, animConfig.loop - 1) })} style={{ padding: '3px 7px', border: 'none', background: 'transparent', color: T.labelColor, cursor: 'pointer', fontSize: 12 }}>−</button>
+                    <span style={{ padding: '0 4px', fontSize: 10, color: T.valueColor, fontFamily: 'monospace', minWidth: 16, textAlign: 'center' }}>{animConfig.loop}</span>
+                    <button onClick={() => updateAnimConfig({ loop: animConfig.loop + 1 })} style={{ padding: '3px 7px', border: 'none', background: 'transparent', color: T.labelColor, cursor: 'pointer', fontSize: 12 }}>+</button>
+                  </div>
+                )}
+                <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, marginLeft: 4 }}>Alt</span>
+                <button
+                  onClick={() => updateAnimConfig({ alternate: !animConfig.alternate })}
+                  style={{ width: 34, height: 18, borderRadius: 9, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', background: animConfig.alternate ? '#3b82f6' : 'rgba(255,255,255,0.1)', flexShrink: 0 }}
+                >
+                  <div style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', left: animConfig.alternate ? 18 : 2 }} />
+                </button>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <button
+                  onClick={runAnimPreview}
+                  style={{
+                    padding: '9px 0', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    border: animIsPreviewing ? '0.5px solid rgba(239,68,68,0.3)' : 'none',
+                    cursor: 'pointer', fontFamily: T.font, transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    background: animIsPreviewing ? 'rgba(239,68,68,0.15)' : '#3b82f6',
+                    color: animIsPreviewing ? '#f87171' : '#fff',
+                  }}
+                >
+                  {animIsPreviewing ? '■ Stop' : '▶ Preview'}
+                </button>
+                <button
+                  onClick={handleApplyAnimation}
+                  style={{
+                    padding: '9px 0', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    border: T.inputBorder, cursor: 'pointer', fontFamily: T.font,
+                    background: 'rgba(255,255,255,0.05)', color: T.valueColor, transition: 'all 0.15s',
+                  }}
+                >
+                  Apply CSS
+                </button>
+              </div>
+            </div>
+          )}
         </Section>
 
         {/* bottom padding */}
