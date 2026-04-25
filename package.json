@@ -20,6 +20,9 @@
     "url": "https://github.com/your-username/optate.git"
   },
   "homepage": "https://optate.dev",
+  "bin": {
+    "optate": "./bin/optate.js"
+  },
   "exports": {
     "./vite": {
       "import": "./dist/plugin.js"
@@ -27,6 +30,7 @@
   },
   "files": [
     "dist",
+    "bin",
     "README.md"
   ],
   "scripts": {
