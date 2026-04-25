@@ -1,43 +1,63 @@
 /**
- * Generates a unique CSS selector for a given element.
+ * Returns a short, clean segment for one element — no class lists.
+ * Priority: id → data-testid/name/aria-label → tag:nth-child
+ */
+function segmentFor(el: HTMLElement): string {
+  const tag = el.tagName.toLowerCase();
+
+  // 1. ID — globally unique, perfect
+  if (el.id) return `#${el.id}`;
+
+  // 2. Stable data / semantic attributes
+  const stable = ['data-testid', 'data-id', 'data-slot', 'name', 'aria-label', 'role', 'type', 'href'];
+  for (const attr of stable) {
+    const val = el.getAttribute(attr);
+    if (val && val.length < 60 && !/\s{2,}/.test(val)) {
+      return `${tag}[${attr}="${CSS.escape(val)}"]`;
+    }
+  }
+
+  // 3. tag + nth-child among same-tag siblings
+  const parent = el.parentElement;
+  if (parent) {
+    const sameTags = Array.from(parent.children).filter(c => c.tagName === el.tagName);
+    if (sameTags.length === 1) return tag; // unique tag in parent — no index needed
+    const idx = Array.from(parent.children).indexOf(el) + 1;
+    return `${tag}:nth-child(${idx})`;
+  }
+
+  return tag;
+}
+
+/**
+ * Generates a short, readable unique CSS selector for a given element.
+ * Walks up the DOM and stops as soon as the selector is unique in the document.
+ * Never includes Tailwind / utility class lists.
  */
 export function getUniqueSelector(el: HTMLElement): string {
-  if (el.id) return `#${el.id}`;
-  
-  const path: string[] = [];
+  // Walk up collecting segments, stopping at the first id anchor
+  const parts: string[] = [];
   let current: HTMLElement | null = el;
-  
+
   while (current && current.nodeType === Node.ELEMENT_NODE) {
-    let selector = current.nodeName.toLowerCase();
-    
-    if (current.className) {
-      const classes = current.className.split(/\s+/).filter(Boolean).join('.');
-      if (classes) selector += `.${classes}`;
-    }
-    
-    if (current.id) {
-      path.unshift(`#${current.id}`);
-      break;
-    }
-    
-    // Nth-child calculation if not unique
-    const parent = current.parentElement;
-    if (parent) {
-      const siblings = Array.from(parent.children).filter(c => c.nodeName === current!.nodeName);
-      if (siblings.length > 1) {
-        const index = Array.from(parent.children).indexOf(current) + 1;
-        selector += `:nth-child(${index})`;
-      }
-    }
-    
-    path.unshift(selector);
+    const tag = current.tagName.toLowerCase();
+    if (['html', 'body'].includes(tag)) { parts.unshift(tag); break; }
+
+    // ID → stop climbing, we have a unique anchor
+    if (current.id) { parts.unshift(`#${current.id}`); break; }
+
+    parts.unshift(segmentFor(current));
+
+    // Check if path so far already uniquely identifies el
+    const candidate = parts.join(' > ');
+    try {
+      if (document.querySelectorAll(candidate).length === 1) break;
+    } catch { /* invalid interim selector, keep climbing */ }
+
     current = current.parentElement;
-    
-    // Stop at body
-    if (current?.nodeName.toLowerCase() === 'html') break;
   }
-  
-  return path.join(' > ');
+
+  return parts.join(' > ');
 }
 
 /**
