@@ -1,6 +1,6 @@
 {
   "name": "@optate/plugin",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Real-time design inspection and editing for your local dev server",
   "type": "module",
   "keywords": [
