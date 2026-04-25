@@ -1,2025 +1,1127 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelection } from '@/lib/selection-context';
-import { getComputedStyleValue, applyStyle, rgbToHex } from '@/lib/css-utils';
-import { animate, spring, stagger, remove, createSpring, cubicBezier, steps, eases } from 'animejs';
+import { applyStyle, getComputedStyleValue, rgbToHex } from '@/lib/css-utils';
 import { changeTracker } from '@/lib/change-tracker';
 import { loadGoogleFont } from '@/lib/dom-utils';
 
-type EditorTab = 'add' | 'box' | 'text' | 'style' | 'layout' | 'effects' | 'animation';
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const GOOGLE_FONTS = [
-  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 
-  'Poppins', 'Playfair Display', 'Oswald', 'Merriweather', 
-  'Ubuntu', 'Lora', 'Nunito', 'Raleway', 'Work Sans'
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat',
+  'Poppins', 'Playfair Display', 'Oswald', 'Merriweather',
+  'Nunito', 'Raleway', 'Work Sans',
 ];
 
-export const EditorPanel: React.FC = () => {
-  const { selectedElement, isEditing, setIsEditing, viewportMode } = useSelection();
-  const [activeTab, setActiveTab] = useState<EditorTab>('box');
-  const [isVisible, setIsVisible] = useState(false);
-  const [panelSide, setPanelSide] = useState<'left' | 'right'>('right');
+const TEXT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li', 'td', 'th'];
 
-  useEffect(() => {
-    if (selectedElement) {
-      const tag = selectedElement.tagName.toLowerCase();
-      const textElements = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li'];
-      
-      // Auto-switch to Text tab if it's a text-heavy element
-      if (textElements.includes(tag) || (selectedElement.children.length === 0 && selectedElement.textContent?.trim())) {
-        setActiveTab('text');
-      } else if (tag === 'img' || tag === 'video') {
-        setActiveTab('style');
-      } else {
-        setActiveTab('box');
-      }
-    }
-  }, [selectedElement]);
+// ─── Design tokens ────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (isEditing) {
-      requestAnimationFrame(() => setIsVisible(true));
-    } else {
-      setIsVisible(false);
-    }
-  }, [isEditing]);
-
-
-  if (!isEditing || !selectedElement) return null;
-
-  const elementTag = selectedElement.tagName.toLowerCase();
-  const elementClass = typeof selectedElement.className === 'string'
-    ? selectedElement.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.')
-    : '';
-  const displayName = elementClass ? `${elementTag}.${elementClass}` : elementTag;
-
-  const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => setIsEditing(false), 200);
-  };
-
-  const handleDelete = () => {
-    if (!selectedElement || !selectedElement.parentElement) return;
-    const parent = selectedElement.parentElement;
-    const oldHtml = parent.innerHTML;
-    
-    selectedElement.remove();
-    
-    changeTracker.recordChange(parent, 'html', 'removeNode', oldHtml, parent.innerHTML);
-    handleClose();
-  };
-
-  const tabs: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'add', label: 'Add', icon: <AddIcon /> },
-    { id: 'box', label: 'Box', icon: <BoxIcon /> },
-    { id: 'text', label: 'Text', icon: <TextIcon /> },
-    { id: 'style', label: 'Style', icon: <StyleIcon /> },
-    { id: 'layout', label: 'Layout', icon: <LayoutIcon /> },
-    { id: 'effects', label: 'Effects', icon: <EffectsIcon /> },
-    { id: 'animation', label: 'Animate', icon: <AnimationIcon /> },
-  ];
-
-  const isMobile = viewportMode === 'mobile';
-  const isTablet = viewportMode === 'tablet';
-
-  return (
-    <div style={{
-      position: 'fixed',
-      zIndex: 2147483642,
-      transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-      fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'rgba(22, 22, 22, 0.75)',
-      backdropFilter: 'blur(24px) saturate(180%)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '20px',
-      boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-      overflow: 'hidden',
-
-      // Side positioning (always side-anchored now)
-      top: '12px',
-      bottom: '12px',
-      right: panelSide === 'right' ? (isVisible ? '12px' : '-340px') : 'auto',
-      left: panelSide === 'left' ? (isVisible ? '12px' : '-340px') : 'auto',
-      
-      // Responsive Sizing
-      width: (isMobile || isTablet) ? '280px' : '320px',
-      height: 'auto',
-      
-      opacity: isVisible ? 1 : 0,
-      pointerEvents: 'auto',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '10px 14px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-          <span style={{
-            fontSize: '11px', color: 'rgba(255,255,255,0.3)',
-          }}>≡</span>
-          <span style={{
-            fontSize: '12px', fontWeight: 600, color: '#22c55e',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {displayName}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <HeaderBtn onClick={handleDelete} tooltip="Delete Element">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M3 4H13M5 4V3C5 2.44772 5.44772 2 6 2H10C10.5523 2 11 2.44772 11 3V4M6 7V11M10 7V11M4 4L4.85714 13.4286C4.90822 13.9904 5.38096 14.4286 5.94511 14.4286H10.0549C10.619 14.4286 11.0918 13.9904 11.1429 13.4286L12 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </HeaderBtn>
-          <HeaderBtn 
-            onClick={() => setPanelSide(panelSide === 'right' ? 'left' : 'right')} 
-            tooltip={`Move to ${panelSide === 'right' ? 'Left' : 'Right'}`}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d={panelSide === 'right' ? "M5 6L3 8L5 10" : "M11 6L13 8L11 10"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </HeaderBtn>
-          <HeaderBtn onClick={() => {}} tooltip="Show CSS">
-            <span style={{ fontSize: '10px', fontWeight: 600 }}>CSS</span>
-          </HeaderBtn>
-          <HeaderBtn onClick={() => {}} tooltip="Settings">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M8 1V3M8 13V15M1 8H3M13 8H15M3.05 3.05L4.46 4.46M11.54 11.54L12.95 12.95M3.05 12.95L4.46 11.54M11.54 4.46L12.95 3.05" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </HeaderBtn>
-          <HeaderBtn onClick={handleClose} tooltip="Close">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
-          </HeaderBtn>
-        </div>
-      </div>
-
-      {/* Body with tabs */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Tab sidebar */}
-        <div style={{
-          width: '52px',
-          borderRight: '1px solid rgba(255,255,255,0.04)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '6px 0',
-          flexShrink: 0,
-        }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '10px 4px',
-                border: 'none',
-                cursor: 'pointer',
-                borderRadius: '0',
-                borderLeft: activeTab === tab.id ? '2px solid #22c55e' : '2px solid transparent',
-                background: activeTab === tab.id ? 'rgba(34, 197, 94, 0.06)' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.15s ease',
-                fontSize: '9px',
-                fontWeight: 500,
-                fontFamily: 'inherit',
-                letterSpacing: '0.02em',
-              }}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab content */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '14px',
-          minHeight: 0,
-        }}>
-          {activeTab === 'add' && <AddTab element={selectedElement} />}
-          {activeTab === 'box' && <BoxTab element={selectedElement} />}
-          {activeTab === 'text' && <TextTab element={selectedElement} />}
-          {activeTab === 'style' && <StyleTab element={selectedElement} />}
-          {activeTab === 'layout' && <LayoutTab element={selectedElement} />}
-          {activeTab === 'effects' && <EffectsTab element={selectedElement} />}
-          {activeTab === 'animation' && <AnimeAnimationTab element={selectedElement} />}
-        </div>
-      </div>
-    </div>
-  );
+const T = {
+  panelBg: 'rgba(20, 20, 20, 0.92)',
+  border: '0.5px solid rgba(255,255,255,0.08)',
+  borderFaint: '0.5px solid rgba(255,255,255,0.05)',
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBgFocus: 'rgba(255,255,255,0.10)',
+  inputBorder: '0.5px solid rgba(255,255,255,0.10)',
+  inputBorderFocus: '0.5px solid rgba(255,255,255,0.25)',
+  labelColor: 'rgba(255,255,255,0.4)',
+  valueColor: 'rgba(255,255,255,0.9)',
+  accent: '#34d399',
+  accentOrange: '#f97316',
+  sectionHeaderColor: 'rgba(255,255,255,0.3)',
+  radius: '8px',
+  font: 'Inter, system-ui, -apple-system, sans-serif',
 };
 
-/* ═══════════════════════════════════════════════════
-   ADD TAB
-   ═══════════════════════════════════════════════════ */
-const AddTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  const insertElement = (type: 'div' | 'p' | 'h2' | 'button' | 'img' | 'input') => {
-    const el = document.createElement(type);
-    
-    // Auto-populate some basic defaults so it's instantly usable and visible
-    if (type === 'div') {
-      el.style.minHeight = '100px';
-      el.style.border = '2px dashed rgba(0,0,0,0.2)';
-      el.style.backgroundColor = 'rgba(0,0,0,0.05)';
-      el.style.padding = '16px';
-      el.textContent = 'New Container';
-    } else if (type === 'p') {
-      el.textContent = 'This is a new paragraph block. Click to edit its content.';
-      el.style.margin = '10px 0';
-    } else if (type === 'h2') {
-      el.textContent = 'New Heading';
-      el.style.fontSize = '24px';
-      el.style.fontWeight = '700';
-      el.style.margin = '16px 0';
-    } else if (type === 'button') {
-      el.textContent = 'Click Me';
-      el.style.padding = '10px 20px';
-      el.style.backgroundColor = '#22c55e';
-      el.style.color = '#fff';
-      el.style.border = 'none';
-      el.style.borderRadius = '6px';
-      el.style.cursor = 'pointer';
-      el.style.fontWeight = '600';
-    } else if (type === 'img') {
-      const img = el as HTMLImageElement;
-      img.src = 'https://placehold.co/600x400?text=Placeholder+Image';
-      img.alt = 'Placeholder';
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-      img.style.borderRadius = '8px';
-      img.style.display = 'block';
-    } else if (type === 'input') {
-      const input = el as HTMLInputElement;
-      input.placeholder = 'Type here...';
-      input.style.padding = '10px 12px';
-      input.style.border = '1px solid #ccc';
-      input.style.borderRadius = '6px';
-      input.style.width = '100%';
-    }
-    
-    const oldHtml = element.innerHTML;
-    element.appendChild(el);
-    changeTracker.recordChange(element, 'html', 'appendChild', oldHtml, element.innerHTML);
-  };
+// ─── Tiny SVG icons ────────────────────────────────────────────────────────────
 
-  const presetStyle = {
-    padding: '12px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '8px',
-    color: '#fff',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    transition: 'all 0.15s ease',
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <SectionTitle>Insert into Selection</SectionTitle>
-      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '-4px' }}>
-        Append a new element inside <span style={{color: '#22c55e'}}>{element.tagName.toLowerCase()}</span>
-      </div>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <button onClick={() => insertElement('div')} style={presetStyle}>
-          <BoxIcon /> Container (Box)
-        </button>
-        <button onClick={() => insertElement('h2')} style={presetStyle}>
-          <span style={{fontWeight:'bold', fontSize:'14px'}}>H</span> Heading
-        </button>
-        <button onClick={() => insertElement('p')} style={presetStyle}>
-          <TextIcon /> Paragraph
-        </button>
-        <button onClick={() => insertElement('button')} style={presetStyle}>
-          <span style={{background:'#22c55e', width:'12px', height:'10px', borderRadius:'2px'}}/> Button
-        </button>
-        <button onClick={() => insertElement('img')} style={presetStyle}>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/><circle cx="5" cy="5" r="1" fill="currentColor"/><path d="M2 12L6.5 8L10 11L11.5 9L14 11" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg> Image
-        </button>
-        <button onClick={() => insertElement('input')} style={presetStyle}>
-          <span style={{border:'1px solid currentColor', width:'12px', height:'8px', borderRadius:'1px'}}/> Text Input
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   BOX TAB
-   ═══════════════════════════════════════════════════ */
-const BoxTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <BoxModelEditor element={element} />
-      
-      <Divider />
-      
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Min. Width" property="min-width" element={element} icon="↔" />
-        <PropField label="Min. Height" property="min-height" element={element} icon="↕" />
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   TEXT TAB
-   ═══════════════════════════════════════════════════ */
-const TextTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  const [text, setText] = useState(element.textContent || '');
-  const [initialText, setInitialText] = useState(element.textContent || '');
-
-  useEffect(() => {
-    const txt = (element.textContent || '').trim();
-    setText(txt);
-    setInitialText(txt);
-  }, [element]);
-
-  const handleTextChange = (newText: string) => {
-    element.textContent = newText;
-    setText(newText);
-  };
-
-  const handleBlur = () => {
-    if (text === initialText) return;
-    changeTracker.recordChange(element, 'text', 'textContent', initialText, text);
-    setInitialText(text); // update baseline
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Content */}
-      <div>
-        <SectionTitle>Content</SectionTitle>
-        <textarea
-          value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onBlur={handleBlur}
-          style={{
-            width: '100%',
-            minHeight: '80px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '6px',
-            padding: '12px',
-            fontSize: '13px',
-            lineHeight: '1.5',
-            color: '#fff',
-            resize: 'vertical',
-            outline: 'none',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            boxSizing: 'border-box',
-            textAlign: 'left',
-          }}
-          placeholder="Enter text..."
-        />
-      </div>
-
-      <Divider />
-
-      {/* Font Family */}
-      <FontFamilyField element={element} />
-
-      {/* Font Size / Weight */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Size" property="font-size" element={element} />
-        <PropField label="Weight" property="font-weight" element={element} />
-      </div>
-
-      {/* Line Height / Letter Spacing */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Line Height" property="line-height" element={element} />
-        <PropField label="Spacing" property="letter-spacing" element={element} />
-      </div>
-
-      <Divider />
-
-      {/* Text Align */}
-      <div>
-        <SectionTitle>Text Align</SectionTitle>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {['left', 'center', 'right', 'justify'].map(align => (
-            <AlignButton
-              key={align}
-              active={getComputedStyleValue(element, 'text-align') === align}
-              onClick={() => {
-                const old = getComputedStyleValue(element, 'text-align');
-                if (old === align) return;
-                applyStyle(element, 'text-align', align);
-                changeTracker.recordChange(element, 'style', 'text-align', old, align);
-              }}
-            >
-              {align === 'left' && '≡'}
-              {align === 'center' && '≡'}
-              {align === 'right' && '≡'}
-              {align === 'justify' && '≡'}
-            </AlignButton>
-          ))}
-        </div>
-      </div>
-
-      {/* Text Transform */}
-      <div>
-        <SectionTitle>Transform</SectionTitle>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {['none', 'uppercase', 'lowercase', 'capitalize'].map(transform => (
-            <AlignButton
-              key={transform}
-              active={getComputedStyleValue(element, 'text-transform') === transform}
-              onClick={() => {
-                const old = getComputedStyleValue(element, 'text-transform');
-                if (old === transform) return;
-                applyStyle(element, 'text-transform', transform);
-                changeTracker.recordChange(element, 'style', 'text-transform', old, transform);
-              }}
-            >
-              <span style={{ fontSize: '9px' }}>
-                {transform === 'none' && 'Aa'}
-                {transform === 'uppercase' && 'AA'}
-                {transform === 'lowercase' && 'aa'}
-                {transform === 'capitalize' && 'Ab'}
-              </span>
-            </AlignButton>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   STYLE TAB
-   ═══════════════════════════════════════════════════ */
-const StyleTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Colors */}
-      <SectionTitle>Colors</SectionTitle>
-      <ColorField label="Text Color" property="color" element={element} />
-      <ColorField label="Background" property="background-color" element={element} />
-
-      <Divider />
-
-      {/* Border */}
-      <SectionTitle>Border</SectionTitle>
-      <ColorField label="Border Color" property="border-color" element={element} />
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Width" property="border-width" element={element} />
-        <SelectField label="Style" property="border-style" element={element}
-          options={['none', 'solid', 'dashed', 'dotted', 'double']}
-        />
-      </div>
-
-      <Divider />
-
-      {/* Border Radius */}
-      <SectionTitle>Border Radius</SectionTitle>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="TL" property="border-top-left-radius" element={element} />
-        <PropField label="TR" property="border-top-right-radius" element={element} />
-      </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="BL" property="border-bottom-left-radius" element={element} />
-        <PropField label="BR" property="border-bottom-right-radius" element={element} />
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   LAYOUT TAB
-   ═══════════════════════════════════════════════════ */
-const LayoutTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <SelectField label="Display" property="display" element={element}
-        options={['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'inline-grid', 'none']}
-      />
-      <SelectField label="Position" property="position" element={element}
-        options={['static', 'relative', 'absolute', 'fixed', 'sticky']}
-      />
-
-      <Divider />
-
-      <SectionTitle>Position Offsets</SectionTitle>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Top" property="top" element={element} />
-        <PropField label="Right" property="right" element={element} />
-      </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <PropField label="Bottom" property="bottom" element={element} />
-        <PropField label="Left" property="left" element={element} />
-      </div>
-
-      <Divider />
-
-      <SectionTitle>Flex</SectionTitle>
-      <SelectField label="Direction" property="flex-direction" element={element}
-        options={['row', 'row-reverse', 'column', 'column-reverse']}
-      />
-      <SelectField label="Justify" property="justify-content" element={element}
-        options={['flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']}
-      />
-      <SelectField label="Align" property="align-items" element={element}
-        options={['flex-start', 'center', 'flex-end', 'stretch', 'baseline']}
-      />
-      <PropField label="Gap" property="gap" element={element} wide />
-
-      <Divider />
-
-      <SelectField label="Overflow" property="overflow" element={element}
-        options={['visible', 'hidden', 'scroll', 'auto']}
-      />
-      <PropField label="Z-Index" property="z-index" element={element} wide />
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   EFFECTS TAB
-   ═══════════════════════════════════════════════════ */
-const EffectsTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <PropField label="Opacity" property="opacity" element={element} wide />
-
-      <Divider />
-
-      <SectionTitle>Box Shadow</SectionTitle>
-      <PropField label="Shadow" property="box-shadow" element={element} wide />
-
-      <Divider />
-
-      <SectionTitle>Transform</SectionTitle>
-      <PropField label="Transform" property="transform" element={element} wide />
-      <PropField label="Transform Origin" property="transform-origin" element={element} wide />
-
-      <Divider />
-
-      <SectionTitle>Transition</SectionTitle>
-      <PropField label="Transition" property="transition" element={element} wide />
-
-      <Divider />
-
-      <SelectField label="Cursor" property="cursor" element={element}
-        options={['auto', 'default', 'pointer', 'move', 'text', 'wait', 'not-allowed', 'grab']}
-      />
-      <SelectField label="Visibility" property="visibility" element={element}
-        options={['visible', 'hidden', 'collapse']}
-      />
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════
-   SHARED COMPONENTS
-   ═══════════════════════════════════════════════════ */
-
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: '6px',
-  padding: '5px 8px',
-  fontSize: '11px',
-  color: '#fff',
-  outline: 'none',
-  fontFamily: 'inherit',
-  width: '100%',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '10px',
-  color: 'rgba(255,255,255,0.4)',
-  fontWeight: 500,
-  minWidth: '48px',
-  flexShrink: 0,
-};
-
-const SliderRow: React.FC<{
-  label: string;
-  value: number;
-  onChange: (val: number) => void;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-}> = ({ label, value, onChange, min, max, step = 1, unit = '' }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', minWidth: 0, overflow: 'hidden' }}>
-    <div style={labelStyle}>{label}</div>
-    <input 
-      type="number" value={value} step={step}
-      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-      style={{ ...inputStyle, width: '44px', textAlign: 'center', flexShrink: 0, padding: '4px 2px' }}
-    />
-    <input 
-      type="range" min={min} max={max} step={step}
-      value={value} onChange={(e) => onChange(parseFloat(e.target.value))}
-      style={{ flex: 1, minWidth: 0, accentColor: '#3b82f6', height: '4px', cursor: 'pointer' }}
-    />
-    {unit && <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{unit}</span>}
-  </div>
+const Icon = ({ d, size = 14, color = 'rgba(255,255,255,0.6)' }: { d: string; size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
 );
 
-const DualAxisRow: React.FC<{
-  label: string;
-  x: number;
-  y: number;
-  onChangeX: (val: number) => void;
-  onChangeY: (val: number) => void;
-  unit?: string;
-}> = ({ label, x, y, onChangeX, onChangeY, unit = '' }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-    <div style={labelStyle}>{label}</div>
-    <div style={{ display: 'flex', gap: '6px' }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <input 
-          type="number" value={x}
-          onChange={(e) => onChangeX(parseFloat(e.target.value) || 0)}
-          style={{ ...inputStyle, paddingRight: '22px' }}
-        />
-        <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>X</span>
-      </div>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <input 
-          type="number" value={y}
-          onChange={(e) => onChangeY(parseFloat(e.target.value) || 0)}
-          style={{ ...inputStyle, paddingRight: '22px' }}
-        />
-        <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>Y</span>
-      </div>
-    </div>
-  </div>
+const ChevronIcon = ({ rotated }: { rotated: boolean }) => (
+  <svg
+    width={12} height={12} viewBox="0 0 24 24" fill="none"
+    stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round"
+    style={{ transform: rotated ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease', flexShrink: 0 }}
+  >
+    <path d="M6 9l6 6 6-6" />
+  </svg>
 );
 
-const SegmentedToggle: React.FC<{
-  options: string[];
+const DeleteIcon = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={13} color="rgba(255,100,100,0.8)" />;
+const FlipIcon = () => <Icon d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" size={13} />;
+const CloseIcon = () => <Icon d="M18 6L6 18M6 6l12 12" size={13} />;
+const LinkIcon = ({ linked }: { linked: boolean }) => (
+  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={linked ? T.accent : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round">
+    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+  </svg>
+);
+
+// ─── Section ──────────────────────────────────────────────────────────────────
+
+const Section: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({
+  title, children, defaultOpen = true,
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ borderBottom: T.borderFaint }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 10, fontFamily: T.font, color: T.sectionHeaderColor,
+          textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600,
+        }}
+      >
+        <span>{title}</span>
+        <ChevronIcon rotated={!open} />
+      </button>
+      {open && <div style={{ padding: '4px 14px 14px' }}>{children}</div>}
+    </div>
+  );
+};
+
+// ─── ScrubInput ───────────────────────────────────────────────────────────────
+
+interface ScrubInputProps {
+  label: string;
   value: string;
-  onChange: (val: any) => void;
-}> = ({ options, value, onChange }) => (
+  unit?: string;
+  onChange: (v: string) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  width?: number;
+}
+
+const ScrubInput: React.FC<ScrubInputProps> = ({
+  label, value, unit = '', onChange, min, max, step = 1, width,
+}) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const dragRef = useRef<{ startX: number; startVal: number; active: boolean }>({ startX: 0, startVal: 0, active: false });
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+
+  const numericVal = () => parseFloat(value) || 0;
+
+  const clamp = (v: number) => {
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    return v;
+  };
+
+  const handleLabelMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startVal: numericVal(), active: false };
+
+    const onMove = (me: MouseEvent) => {
+      const dx = me.clientX - dragRef.current.startX;
+      if (Math.abs(dx) > 2) dragRef.current.active = true;
+      if (dragRef.current.active) {
+        const delta = Math.round(dx / 2) * step;
+        const newVal = clamp(dragRef.current.startVal + delta);
+        onChange(`${newVal}${unit}`);
+      }
+    };
+
+    const onUp = () => {
+      if (!dragRef.current.active) setEditing(true);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const commit = (v: string) => {
+    const n = parseFloat(v);
+    if (!isNaN(n)) onChange(`${clamp(n)}${unit}`);
+    setEditing(false);
+  };
+
+  const displayVal = value.replace(unit, '').trim() || '0';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: width ? width : '100%' }}>
+      <span
+        onMouseDown={handleLabelMouseDown}
+        style={{
+          fontSize: 10, color: T.labelColor, cursor: 'ew-resize',
+          userSelect: 'none', fontFamily: T.font, lineHeight: 1,
+        }}
+      >
+        {label}
+      </span>
+      <div style={{ position: 'relative' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={editing ? draft : displayVal}
+          onChange={e => setDraft(e.target.value)}
+          onFocus={() => { setFocused(true); setEditing(true); setDraft(displayVal); setTimeout(() => inputRef.current?.select(), 0); }}
+          onBlur={() => { setFocused(false); commit(draft); }}
+          onKeyDown={e => { if (e.key === 'Enter') commit(draft); if (e.key === 'Escape') { setEditing(false); setFocused(false); } }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: focused ? T.inputBgFocus : T.inputBg,
+            border: focused ? T.inputBorderFocus : T.inputBorder,
+            borderRadius: 6, padding: '4px 22px 4px 7px',
+            color: T.valueColor, fontSize: 12, fontFamily: T.font,
+            outline: 'none', transition: 'background 0.15s, border 0.15s',
+          }}
+        />
+        {unit && (
+          <span style={{
+            position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 10, color: T.labelColor, pointerEvents: 'none', fontFamily: T.font,
+          }}>
+            {unit}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── ColorSwatch ──────────────────────────────────────────────────────────────
+
+interface ColorSwatchProps {
+  value: string;
+  onChange: (hex: string) => void;
+}
+
+const toHex = (v: string): string => {
+  if (!v || v === 'transparent' || v === 'none') return '#000000';
+  if (v.startsWith('#')) return v.length === 4 ? `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}` : v;
+  if (v.startsWith('rgb')) {
+    const m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (m) return `#${[m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('')}`;
+  }
+  return '#000000';
+};
+
+const ColorSwatch: React.FC<ColorSwatchProps> = ({ value, onChange }) => {
+  const hex = toHex(value);
+  const [draft, setDraft] = useState(hex);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => { if (!focused) setDraft(hex); }, [hex, focused]);
+
+  const commitHex = (v: string) => {
+    const clean = v.startsWith('#') ? v : `#${v}`;
+    if (/^#[0-9a-fA-F]{6}$/.test(clean)) onChange(clean);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+      <div style={{ position: 'relative', width: 22, height: 22, flexShrink: 0 }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: 5,
+          background: hex, border: T.inputBorder,
+          boxSizing: 'border-box', cursor: 'pointer',
+        }} />
+        <input
+          type="color"
+          value={hex}
+          onChange={e => { setDraft(e.target.value); onChange(e.target.value); }}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+        />
+      </div>
+      <input
+        type="text"
+        value={draft}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); commitHex(draft); }}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') commitHex(draft); }}
+        style={{
+          flex: 1, minWidth: 0, background: focused ? T.inputBgFocus : T.inputBg,
+          border: focused ? T.inputBorderFocus : T.inputBorder,
+          borderRadius: 6, padding: '4px 7px', color: T.valueColor,
+          fontSize: 12, fontFamily: T.font, outline: 'none',
+        }}
+      />
+    </div>
+  );
+};
+
+// ─── Row2 ─────────────────────────────────────────────────────────────────────
+
+interface FieldDef { label: string; value: string; unit?: string; onChange: (v: string) => void; }
+
+const Row2: React.FC<{ a: FieldDef; b: FieldDef }> = ({ a, b }) => (
+  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+    <ScrubInput {...a} />
+    <ScrubInput {...b} />
+  </div>
+);
+
+// ─── SegmentedControl ─────────────────────────────────────────────────────────
+
+interface SegOption { label: string; value: string }
+
+const Segmented: React.FC<{ options: SegOption[]; value: string; onChange: (v: string) => void }> = ({
+  options, value, onChange,
+}) => (
   <div style={{
-    display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '8px',
-    padding: '2px', border: '1px solid rgba(255,255,255,0.06)',
+    display: 'flex', background: T.inputBg, border: T.inputBorder,
+    borderRadius: 7, padding: 2, gap: 1,
   }}>
     {options.map(opt => (
       <button
-        key={opt}
-        onClick={() => onChange(opt)}
+        key={opt.value}
+        onClick={() => onChange(opt.value)}
         style={{
-          flex: 1, padding: '5px 8px', borderRadius: '6px', fontSize: '10px',
-          fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          transition: 'all 0.15s ease',
-          background: value === opt ? 'rgba(255,255,255,0.1)' : 'transparent',
-          color: value === opt ? '#fff' : 'rgba(255,255,255,0.35)',
+          flex: 1, padding: '4px 4px', fontSize: 11, fontFamily: T.font,
+          borderRadius: 5, border: 'none', cursor: 'pointer',
+          background: value === opt.value ? 'rgba(255,255,255,0.12)' : 'none',
+          color: value === opt.value ? T.valueColor : T.labelColor,
+          transition: 'background 0.15s, color 0.15s', fontWeight: value === opt.value ? 600 : 400,
         }}
       >
-        {opt}
+        {opt.label}
       </button>
     ))}
   </div>
 );
 
-const NumberStepper: React.FC<{
-  value: number;
-  onChange: (val: number) => void;
-  step?: number;
-  min?: number;
-}> = ({ value, onChange, step = 1, min = 0 }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.04)',
-    borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden',
-  }}>
-    <button
-      onClick={() => onChange(Math.max(min, value - step))}
-      style={{ padding: '4px 8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}
-    >−</button>
-    <span style={{ padding: '0 6px', fontSize: '10px', color: '#fff', fontFamily: 'monospace', minWidth: '20px', textAlign: 'center' }}>{value}</span>
-    <button
-      onClick={() => onChange(value + step)}
-      style={{ padding: '4px 8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}
-    >+</button>
-  </div>
+// ─── SmallSelect ──────────────────────────────────────────────────────────────
+
+const SmallSelect: React.FC<{ value: string; onChange: (v: string) => void; options: string[] | { label: string; value: string }[] }> = ({
+  value, onChange, options,
+}) => (
+  <select
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    style={{
+      background: T.inputBg, border: T.inputBorder, borderRadius: 6,
+      color: T.valueColor, fontSize: 12, fontFamily: T.font,
+      padding: '4px 6px', outline: 'none', width: '100%', cursor: 'pointer',
+    }}
+  >
+    {options.map(o => {
+      const v = typeof o === 'string' ? o : o.value;
+      const l = typeof o === 'string' ? o : o.label;
+      return <option key={v} value={v}>{l}</option>;
+    })}
+  </select>
 );
 
-/* ═══════════════════════════════════════════════════
-   EASING CURVE PREVIEW (Interactive Bezier + Sampled)
-   ═══════════════════════════════════════════════════ */
-const EasingCurvePreview: React.FC<{
-  config: AnimationConfig;
-  onBezierChange?: (bezier: string) => void;
-}> = ({ config, onBezierChange }) => {
-  const ballRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const [dragging, setDragging] = useState<'p1' | 'p2' | null>(null);
+// ─── Label ────────────────────────────────────────────────────────────────────
 
-  // Graph dimensions
-  const W = 220;
-  const H = 140;
-  const PAD = 20;
-  const graphW = W - PAD * 2;
-  const graphH = H - PAD * 2;
+const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 3 }}>{children}</span>
+);
 
-  // Anchor points in SVG space
-  const startX = PAD, startY = H - PAD;   // (0, 0)
-  const endX = PAD + graphW, endY = PAD;   // (1, 1)
+// ─── IconButton ───────────────────────────────────────────────────────────────
 
-  // Parse bezier values
-  const parseBezier = (): [number, number, number, number] => {
-    try {
-      const vals = config.customBezier.split(',').map(n => parseFloat(n.trim()));
-      if (vals.length === 4 && vals.every(v => !isNaN(v))) {
-        return vals as [number, number, number, number];
-      }
-    } catch {}
-    return [0.42, 0, 0.58, 1];
-  };
-
-  const [x1, y1, x2, y2] = parseBezier();
-
-  // Convert bezier values to SVG coordinates
-  const toSvgX = (v: number) => PAD + v * graphW;
-  const toSvgY = (v: number) => (H - PAD) - v * graphH;
-  // Convert SVG coordinates back to bezier values
-  const fromSvgX = (sx: number) => Math.max(0, Math.min(1, (sx - PAD) / graphW));
-  const fromSvgY = (sy: number) => (H - PAD - sy) / graphH;
-
-  // Control points in SVG space
-  const cp1x = toSvgX(x1), cp1y = toSvgY(y1);
-  const cp2x = toSvgX(x2), cp2y = toSvgY(y2);
-
-  // Resolve easing function for non-bezier modes
-  const getEasingFn = (): ((t: number) => number) | null => {
-    try {
-      if (config.easingType === 'ease') {
-        const fn = (eases as any)[config.easingName];
-        if (!fn) return null;
-        if (typeof fn === 'function') {
-          if (fn.length > 0 || ['in','out','inOut','outIn','inBack','outBack','inOutBack','outInBack','inElastic','outElastic','inOutElastic','outInElastic'].includes(config.easingName)) {
-            try { const r = fn(); return typeof r === 'function' ? r : fn; } catch { return fn; }
-          }
-          return fn;
-        }
-        return null;
-      }
-      return null;
-    } catch { return null; }
-  };
-
-  // Generate sampled curve path for ease/spring modes
-  const generateSampledPath = (): string => {
-    const easeFn = getEasingFn();
-    if (!easeFn) {
-      return `M ${startX} ${startY} C ${PAD + graphW * 0.25} ${PAD - 10}, ${PAD + graphW * 0.6} ${H - PAD + 10}, ${endX} ${endY}`;
-    }
-    const steps = 60;
-    const pts: string[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      let val: number;
-      try { val = easeFn(t); } catch { val = t; }
-      const cv = Math.max(-0.3, Math.min(1.3, val));
-      pts.push(`${(PAD + t * graphW).toFixed(1)},${((H - PAD) - cv * graphH).toFixed(1)}`);
-    }
-    return `M ${pts[0]} L ${pts.slice(1).join(' L ')}`;
-  };
-
-  // The curve path & label
-  const isBezierMode = config.easingType === 'bezier';
-  const curvePath = isBezierMode
-    ? `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`
-    : generateSampledPath();
-  const easingLabel = config.easingType === 'ease'
-    ? config.easingName
-    : config.easingType === 'spring' ? 'spring'
-    : `bezier(${x1.toFixed(2)}, ${y1.toFixed(2)}, ${x2.toFixed(2)}, ${y2.toFixed(2)})`;
-
-  // ── Drag handling for bezier handles ──
-  const getSvgPoint = (e: React.MouseEvent | MouseEvent): { x: number; y: number } => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    const scaleX = W / rect.width;
-    const scaleY = H / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const handleMouseDown = (handle: 'p1' | 'p2') => (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(handle);
-  };
-
-  useEffect(() => {
-    if (!dragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const pt = getSvgPoint(e);
-      const bx = fromSvgX(pt.x);
-      const by = fromSvgY(pt.y);
-      // Clamp x to [0,1], allow y overshoot [-0.5, 1.5]
-      const cx = Math.round(Math.max(0, Math.min(1, bx)) * 100) / 100;
-      const cy = Math.round(Math.max(-0.5, Math.min(1.5, by)) * 100) / 100;
-
-      if (dragging === 'p1') {
-        onBezierChange?.(`${cx}, ${cy}, ${x2}, ${y2}`);
-      } else {
-        onBezierChange?.(`${x1}, ${y1}, ${cx}, ${cy}`);
-      }
-    };
-
-    const handleMouseUp = () => setDragging(null);
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging, x1, y1, x2, y2]);
-
-  // ── Hover ball animation ──
-  const onEnter = () => {
-    if (dragging) return;
-    setIsHovering(true);
-    const ball = ballRef.current;
-    if (!ball) return;
-    try { remove(ball); } catch {}
-    ball.style.transform = 'translateX(0px)';
-
-    const animParams: Record<string, any> = {
-      translateX: [0, graphW],
-      duration: Math.min(config.duration, 2000),
-      loop: false,
-    };
-    if (config.easingType === 'spring') {
-      animParams.ease = spring(config.springConfig);
-    } else if (config.easingType === 'bezier') {
-      try {
-        const vals = config.customBezier.split(',').map(n => parseFloat(n.trim()));
-        if (vals.length === 4 && vals.every(v => !isNaN(v)))
-          animParams.ease = cubicBezier(vals[0], vals[1], vals[2], vals[3]);
-      } catch {}
-    } else {
-      animParams.ease = config.easingName;
-    }
-    animParams.onComplete = () => {
-      setTimeout(() => {
-        if (ball) ball.style.transform = 'translateX(0px)';
-        setIsHovering(false);
-      }, 400);
-    };
-    try { animate(ball, animParams); } catch {}
-  };
-
-  const onLeave = () => {
-    if (dragging) return;
-    const ball = ballRef.current;
-    if (ball) { try { remove(ball); } catch {} ball.style.transform = 'translateX(0px)'; }
-    setIsHovering(false);
-  };
-
-  return (
-    <div
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: `1px solid ${dragging ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.06)'}`,
-        borderRadius: '10px',
-        padding: '8px 0 0 0',
-        cursor: isBezierMode ? 'default' : 'pointer',
-        position: 'relative',
-        overflow: 'visible',
-      }}
-    >
-      {/* Hint labels */}
-      <div style={{ position: 'absolute', top: '6px', right: '8px', fontSize: '7px', color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {isBezierMode ? 'Drag handles' : 'Hover to play'}
-      </div>
-      <div style={{ position: 'absolute', top: '6px', left: '10px', fontSize: '9px', color: 'rgba(59,130,246,0.6)', fontWeight: 500, fontFamily: 'monospace' }}>
-        {easingLabel}
-      </div>
-
-      {/* SVG Curve */}
-      <svg
-        ref={svgRef}
-        width="100%"
-        height={H}
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ display: 'block', userSelect: 'none' }}
-      >
-        {/* Grid */}
-        <line x1={PAD} y1={H - PAD} x2={PAD + graphW} y2={H - PAD} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-        <line x1={PAD} y1={PAD} x2={PAD + graphW} y2={PAD} stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="3,3" />
-        <line x1={PAD} y1={H - PAD} x2={PAD} y2={PAD} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-        {/* Linear diagonal ref */}
-        <line x1={PAD} y1={H - PAD} x2={PAD + graphW} y2={PAD} stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4,4" />
-
-        {/* The curve */}
-        <path d={curvePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-
-        {isBezierMode ? (
-          <>
-            {/* Handle lines: start→P1, end→P2 */}
-            <line x1={startX} y1={startY} x2={cp1x} y2={cp1y} stroke="#3b82f6" strokeWidth="1.5" />
-            <line x1={endX} y1={endY} x2={cp2x} y2={cp2y} stroke="#3b82f6" strokeWidth="1.5" />
-
-            {/* Anchor dots (grey, fixed) */}
-            <circle cx={startX} cy={startY} r="5" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-            <circle cx={endX} cy={endY} r="5" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-
-            {/* P1 handle (draggable) */}
-            <circle
-              cx={cp1x} cy={cp1y} r="7"
-              fill="#3b82f6"
-              stroke="#fff"
-              strokeWidth="1.5"
-              style={{ cursor: 'grab', filter: dragging === 'p1' ? 'drop-shadow(0 0 4px rgba(59,130,246,0.8))' : 'none' }}
-              onMouseDown={handleMouseDown('p1')}
-            />
-            {/* P2 handle (draggable) */}
-            <circle
-              cx={cp2x} cy={cp2y} r="7"
-              fill="#3b82f6"
-              stroke="#fff"
-              strokeWidth="1.5"
-              style={{ cursor: 'grab', filter: dragging === 'p2' ? 'drop-shadow(0 0 4px rgba(59,130,246,0.8))' : 'none' }}
-              onMouseDown={handleMouseDown('p2')}
-            />
-          </>
-        ) : (
-          <>
-            {/* Non-interactive start/end dots */}
-            <circle cx={PAD} cy={H - PAD} r="3.5" fill="#3b82f6" opacity="0.8" />
-            <circle cx={PAD + graphW} cy={PAD} r="3.5" fill="rgba(255,255,255,0.3)" />
-          </>
-        )}
-      </svg>
-
-      {/* Animated ball track */}
-      <div style={{ padding: '4px 14px 10px', position: 'relative' }}>
-        <div style={{ height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '1px', position: 'relative' }}>
-          <div
-            ref={ballRef}
-            style={{
-              position: 'absolute', top: '-4px', left: '-5px',
-              width: '10px', height: '10px', borderRadius: '50%',
-              background: isHovering ? '#3b82f6' : 'rgba(255,255,255,0.2)',
-              boxShadow: isHovering ? '0 0 8px rgba(59,130,246,0.4)' : 'none',
-              transition: isHovering ? 'none' : 'background 0.2s ease',
-              willChange: 'transform',
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-const PropField: React.FC<{
-  label: string;
-  property: string;
-  element: HTMLElement;
-  icon?: string;
-  placeholder?: string;
-  wide?: boolean;
-}> = ({ label, property, element, icon, placeholder, wide }) => {
-  const [value, setValue] = useState('');
-  const [focused, setFocused] = useState(false);
-
-  useEffect(() => {
-    setValue(getComputedStyleValue(element, property));
-  }, [element, property]);
-
-  const handleApply = (newValue: string) => {
-    const oldValue = getComputedStyleValue(element, property);
-    if (oldValue === newValue || newValue === '') return;
-    
-    applyStyle(element, property, newValue);
-    setValue(newValue);
-    changeTracker.recordChange(element, 'style', property, oldValue, newValue);
-  };
-
-  return (
-    <div style={{ flex: wide ? 'unset' : 1, width: wide ? '100%' : undefined }}>
-      {label && (
-        <div style={{
-          fontSize: '10px', color: 'rgba(255,255,255,0.35)',
-          marginBottom: '4px', fontWeight: 500,
-        }}>
-          {label}
-        </div>
-      )}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        background: focused ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
-        border: focused ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '6px',
-        padding: '0 8px',
-        transition: 'all 0.15s ease',
-      }}>
-        {icon && (
-          <span style={{
-            fontSize: '10px', color: 'rgba(255,255,255,0.25)',
-            marginRight: '4px', flexShrink: 0,
-          }}>
-            {icon}
-          </span>
-        )}
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => {
-            setFocused(false);
-            handleApply(value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleApply(value);
-          }}
-          placeholder={placeholder || property}
-          style={{
-            width: '100%',
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: '#fff',
-            fontSize: '11px',
-            fontFamily: 'inherit',
-            padding: '6px 0',
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-const ColorField: React.FC<{
-  label: string;
-  property: string;
-  element: HTMLElement;
-}> = ({ label, property, element }) => {
-  const [value, setValue] = useState('');
-  const [hexValue, setHexValue] = useState('');
-
-  useEffect(() => {
-    const computed = getComputedStyleValue(element, property);
-    setValue(computed);
-    setHexValue(rgbToHex(computed));
-  }, [element, property]);
-
-  const handleChange = (newValue: string) => {
-    const oldValue = getComputedStyleValue(element, property);
-    if (oldValue === newValue || rgbToHex(oldValue) === newValue) return;
-
-    applyStyle(element, property, newValue);
-    setValue(newValue);
-    setHexValue(rgbToHex(newValue));
-    changeTracker.recordChange(element, 'style', property, oldValue, newValue);
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 500, flexShrink: 0 }}>
-        {label}
-      </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <input
-          type="color"
-          value={hexValue.startsWith('#') ? hexValue : '#000000'}
-          onChange={(e) => handleChange(e.target.value)}
-          style={{
-            width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.1)',
-            borderRadius: '4px', cursor: 'pointer', background: 'transparent', padding: 0,
-          }}
-        />
-        <input
-          value={hexValue}
-          onChange={(e) => {
-            setHexValue(e.target.value);
-          }}
-          onBlur={() => handleChange(hexValue)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleChange(hexValue); }}
-          style={{
-            width: '72px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '6px',
-            padding: '5px 8px',
-            fontSize: '10px',
-            color: '#fff',
-            fontFamily: 'monospace',
-            outline: 'none',
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-const SelectField: React.FC<{
-  label: string;
-  property: string;
-  element: HTMLElement;
-  options: string[];
-}> = ({ label, property, element, options }) => {
-  const [value, setValue] = useState('');
-
-  useEffect(() => {
-    setValue(getComputedStyleValue(element, property));
-  }, [element, property]);
-
-  const handleChange = (newValue: string) => {
-    const oldValue = getComputedStyleValue(element, property);
-    if (oldValue === newValue) return;
-    
-    applyStyle(element, property, newValue);
-    setValue(newValue);
-    changeTracker.recordChange(element, 'style', property, oldValue, newValue);
-  };
-
-  return (
-    <div>
-      <div style={{
-        fontSize: '10px', color: 'rgba(255,255,255,0.35)',
-        marginBottom: '4px', fontWeight: 500,
-      }}>
-        {label}
-      </div>
-      <select
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        style={{
-          width: '100%',
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '6px',
-          padding: '6px 8px',
-          fontSize: '11px',
-          color: '#fff',
-          outline: 'none',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          appearance: 'auto',
-        }}
-      >
-        {options.map(opt => (
-          <option key={opt} value={opt} style={{ background: '#222', color: '#fff' }}>
-            {opt}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
-const FontFamilyField: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  const [value, setValue] = useState('');
-
-  useEffect(() => {
-    setValue(getComputedStyleValue(element, 'font-family').split(',')[0].replace(/['"]/g, '').trim());
-  }, [element]);
-
-  const handleChange = (newFont: string) => {
-    const oldValue = getComputedStyleValue(element, 'font-family');
-    if (oldValue.includes(newFont)) return;
-    
-    loadGoogleFont(newFont);
-    applyStyle(element, 'font-family', `'${newFont}', sans-serif`);
-    setValue(newFont);
-    changeTracker.recordChange(element, 'style', 'font-family', oldValue, newFont);
-  };
-
-  return (
-    <div>
-      <div style={{
-        fontSize: '10px', color: 'rgba(255,255,255,0.35)',
-        marginBottom: '4px', fontWeight: 500,
-      }}>
-        Font Family
-      </div>
-      <select
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        style={{
-          width: '100%',
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '6px',
-          padding: '6px 8px',
-          fontSize: '11px',
-          color: '#fff',
-          outline: 'none',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          appearance: 'auto',
-        }}
-      >
-        <option value="">Default Font</option>
-        {GOOGLE_FONTS.map(font => (
-          <option key={font} value={font} style={{ background: '#222', color: '#fff', fontFamily: font }}>
-            {font}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
-const AlignButton: React.FC<{
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}> = ({ active, onClick, children }) => (
+const IconBtn: React.FC<{ onClick: () => void; title?: string; children: React.ReactNode; danger?: boolean }> = ({
+  onClick, title, children, danger,
+}) => (
   <button
     onClick={onClick}
+    title={title}
     style={{
-      flex: 1,
-      padding: '6px',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-      background: active ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.04)',
-      color: active ? '#22c55e' : 'rgba(255,255,255,0.4)',
-      fontSize: '12px',
-      fontFamily: 'inherit',
-      transition: 'all 0.15s ease',
+      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(255,255,255,0.05)', border: T.border, borderRadius: 8, cursor: 'pointer',
+      transition: 'background 0.15s',
     }}
+    onMouseEnter={e => (e.currentTarget.style.background = danger ? 'rgba(255,80,80,0.12)' : 'rgba(255,255,255,0.10)')}
+    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
   >
     {children}
   </button>
 );
 
-const HeaderBtn: React.FC<{
-  onClick: () => void;
-  tooltip?: string;
-  children: React.ReactNode;
-}> = ({ onClick, tooltip, children }) => {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      title={tooltip}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '5px 8px', border: 'none', borderRadius: '5px',
-        cursor: 'pointer', fontFamily: 'inherit',
-        background: hovered ? 'rgba(255,255,255,0.08)' : 'transparent',
-        color: 'rgba(255,255,255,0.5)',
-        transition: 'all 0.15s ease',
-      }}
-    >
-      {children}
-    </button>
-  );
-};
+// ─── getFiberComponentName ────────────────────────────────────────────────────
 
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{
-    fontSize: '11px',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: '6px',
-  }}>
-    {children}
-  </div>
-);
-
-const Divider: React.FC = () => (
-  <div style={{
-    height: '1px',
-    background: 'rgba(255,255,255,0.04)',
-    margin: '2px 0',
-  }} />
-);
-
-/* ═══════════════════════════════════════════════════
-   TAB ICONS (inline SVG)
-   ═══════════════════════════════════════════════════ */
-const AddIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-const BoxIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-    <rect x="5" y="5" width="6" height="6" rx="0.5" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
-  </svg>
-);
-const TextIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path d="M4 3H12M8 3V13M6 13H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-  </svg>
-);
-const StyleIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
-    <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
-  </svg>
-);
-const LayoutIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-    <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-    <rect x="2" y="9" width="12" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-  </svg>
-);
-const EffectsIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path d="M8 2L9.5 5H12.5L10 7.5L11 11L8 9L5 11L6 7.5L3.5 5H6.5L8 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-  </svg>
-);
-
-const BoxModelEditor: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  return (
-    <div style={{
-      padding: '20px 10px',
-      background: 'rgba(255,255,255,0.02)',
-      borderRadius: '12px',
-      border: '1px solid rgba(255,255,255,0.05)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-    }}>
-      {/* Margin Box */}
-      <div style={{
-        width: '100%',
-        background: 'rgba(249, 115, 22, 0.1)',
-        border: '1px dashed rgba(249, 115, 22, 0.3)',
-        borderRadius: '4px',
-        padding: '24px',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        <BoxLabel label="MARGIN" color="rgba(249, 115, 22, 0.6)" />
-        <BoxInput property="margin-top" element={element} position="top" />
-        <BoxInput property="margin-bottom" element={element} position="bottom" />
-        <BoxInput property="margin-left" element={element} position="left" />
-        <BoxInput property="margin-right" element={element} position="right" />
-
-        {/* Padding Box */}
-        <div style={{
-          width: '100%',
-          background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: '4px',
-          padding: '24px',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}>
-          <BoxLabel label="PADDING" color="rgba(34, 197, 94, 0.6)" />
-          <BoxInput property="padding-top" element={element} position="top" />
-          <BoxInput property="padding-bottom" element={element} position="bottom" />
-          <BoxInput property="padding-left" element={element} position="left" />
-          <BoxInput property="padding-right" element={element} position="right" />
-
-          {/* Content Size */}
-          <div style={{
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '4px',
-            padding: '8px 12px',
-            fontSize: '11px',
-            color: '#60a5fa',
-            fontWeight: 700,
-          }}>
-            {Math.round(element.getBoundingClientRect().width)} × {Math.round(element.getBoundingClientRect().height)}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const BoxLabel: React.FC<{ label: string, color: string }> = ({ label, color }) => (
-  <div style={{
-    position: 'absolute',
-    top: '4px',
-    left: '6px',
-    fontSize: '8px',
-    fontWeight: 900,
-    color: color,
-    letterSpacing: '0.05em',
-  }}>{label}</div>
-);
-
-const BoxInput: React.FC<{ property: string, element: HTMLElement, position: 'top' | 'bottom' | 'left' | 'right' }> = ({ property, element, position }) => {
-  const [value, setValue] = useState('');
-  
-  useEffect(() => {
-    const val = getComputedStyleValue(element, property);
-    setValue(val === '0px' ? '0' : val.replace('px', ''));
-  }, [element, property]);
-
-  const handleApply = (newVal: string) => {
-    const oldValue = getComputedStyleValue(element, property);
-    const finalVal = newVal === '0' || newVal === '' ? '0px' : (newVal.endsWith('px') || newVal.endsWith('%') ? newVal : newVal + 'px');
-    applyStyle(element, property, finalVal);
-    changeTracker.recordChange(element, 'style', property, oldValue, finalVal);
-  };
-
-  const styles: React.CSSProperties = {
-    position: 'absolute',
-    fontSize: '10px',
-    color: '#fff',
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    width: '24px',
-    textAlign: 'center',
-    fontWeight: 600,
-  };
-
-  if (position === 'top') { styles.top = '4px'; styles.left = '50%'; styles.transform = 'translateX(-50%)'; }
-  if (position === 'bottom') { styles.bottom = '4px'; styles.left = '50%'; styles.transform = 'translateX(-50%)'; }
-  if (position === 'left') { styles.left = '4px'; styles.top = '50%'; styles.transform = 'translateY(-50%)'; }
-  if (position === 'right') { styles.right = '4px'; styles.top = '50%'; styles.transform = 'translateY(-50%)'; }
-
-  return (
-    <input 
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => handleApply(value)}
-      onKeyDown={(e) => e.key === 'Enter' && handleApply(value)}
-      style={styles}
-    />
-  );
-};
-
-const ANIMATION_PRESETS: Record<string, any> = {
-  'Fade In':     { opacity: 0, duration: 600, easingName: 'outQuad' },
-  'Slide Up':    { offsetY: 30, opacity: 0, duration: 500, easingName: 'outCubic' },
-  'Slide Down':  { offsetY: -30, opacity: 0, duration: 500, easingName: 'outCubic' },
-  'Slide Left':  { offsetX: 40, opacity: 0, duration: 500, easingName: 'outCubic' },
-  'Slide Right': { offsetX: -40, opacity: 0, duration: 500, easingName: 'outCubic' },
-  'Zoom In':     { scale: 0.8, opacity: 0, duration: 500, easingName: 'outBack' },
-  'Zoom Out':    { scale: 1.2, opacity: 0, duration: 500, easingName: 'outCubic' },
-  'Bounce In':   { scale: 0, easingType: 'spring', springConfig: { mass: 1, stiffness: 100, damping: 10, velocity: 0, bounce: 0.65, duration: 628 } },
-  'Flip X':      { rotateMode: '3d', rotateX: 90, duration: 700, easingName: 'outExpo' },
-  'Flip Y':      { rotateMode: '3d', rotateY: 90, duration: 700, easingName: 'outExpo' },
-  'Blur Reveal': { blur: 12, opacity: 0, duration: 800, easingName: 'outExpo' },
-  'Rotate In':   { rotate: -180, opacity: 0, scale: 0.5, duration: 600, easingName: 'outBack' },
-};
-
-const EASING_CATEGORIES: Record<string, string[]> = {
-  'Standard': ['linear', 'in', 'out', 'inOut'],
-  'Quad': ['inQuad', 'outQuad', 'inOutQuad'],
-  'Cubic': ['inCubic', 'outCubic', 'inOutCubic'],
-  'Quart': ['inQuart', 'outQuart', 'inOutQuart'],
-  'Quint': ['inQuint', 'outQuint', 'inOutQuint'],
-  'Sine': ['inSine', 'outSine', 'inOutSine'],
-  'Expo': ['inExpo', 'outExpo', 'inOutExpo'],
-  'Circ': ['inCirc', 'outCirc', 'inOutCirc'],
-  'Back': ['inBack', 'outBack', 'inOutBack'],
-  'Elastic': ['inElastic', 'outElastic', 'inOutElastic'],
-  'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
-};
-
-interface AnimationConfig {
-  opacity: number;
-  scale: number;
-  blur: number;
-  rotate: number;
-  rotateMode: '2d' | '3d';
-  rotateX: number;
-  rotateY: number;
-  skewX: number;
-  skewY: number;
-  offsetX: number;
-  offsetY: number;
-  duration: number;
-  delay: number;
-  loop: number;
-  infinite: boolean;
-  alternate: boolean;
-  easingType: 'ease' | 'spring' | 'bezier';
-  easingName: string;
-  springConfig: {
-    mass: number;
-    stiffness: number;
-    damping: number;
-    velocity: number;
-    bounce: number;
-    duration: number;
-  };
-  customBezier: string;
+function getFiberComponentName(el: HTMLElement): string | null {
+  try {
+    const key = Object.keys(el).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+    if (!key) return null;
+    let fiber = (el as any)[key];
+    while (fiber) {
+      const name = fiber.type?.displayName || fiber.type?.name;
+      if (name && name !== 'div' && name !== 'span' && !/^[a-z]/.test(name)) return name;
+      fiber = fiber.return;
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
-const DEFAULT_CONFIG: AnimationConfig = {
-  opacity: 1, scale: 1, blur: 0, rotate: 0, rotateMode: '2d',
-  rotateX: 0, rotateY: 0, skewX: 0, skewY: 0, offsetX: 0, offsetY: 0,
-  duration: 800, delay: 0, loop: 1, infinite: false, alternate: false,
-  easingType: 'ease', easingName: 'outExpo',
-  springConfig: { mass: 1, stiffness: 100, damping: 10, velocity: 0, bounce: 0, duration: 0 },
-  customBezier: '0.42, 0, 1, 1'
-};
+// ─── Spacing BoxModel ────────────────────────────────────────────────────────
 
-const AnimeAnimationTab: React.FC<{ element: HTMLElement }> = ({ element }) => {
-  const [config, setConfig] = useState<AnimationConfig>(DEFAULT_CONFIG);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState("");
-  const originalStyles = useRef<Record<string, string>>({});
-  const previewAnim = useRef<any>(null);
-  const miniPreviewRef = useRef<HTMLDivElement>(null);
-  const miniPreviewAnim = useRef<any>(null);
+interface SpacingValues { top: string; right: string; bottom: string; left: string }
 
-  // Determine if selected element is text-like
-  const isTextElement = (() => {
-    const tag = element.tagName.toLowerCase();
-    const textTags = ['h1','h2','h3','h4','h5','h6','p','span','a','button','label','li','td','th','caption'];
-    if (textTags.includes(tag)) return true;
-    if (element.children.length === 0 && (element.textContent?.trim().length || 0) > 0) return true;
-    return false;
-  })();
+const BoxModelWidget: React.FC<{
+  padding: SpacingValues;
+  margin: SpacingValues;
+  onPaddingChange: (side: keyof SpacingValues, v: string) => void;
+  onMarginChange: (side: keyof SpacingValues, v: string) => void;
+}> = ({ padding, margin, onPaddingChange, onMarginChange }) => {
+  const [paddingLinked, setPaddingLinked] = useState(false);
+  const [marginLinked, setMarginLinked] = useState(false);
 
-  const updateConfig = (updates: Partial<AnimationConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
-    setSelectedPreset("");
+  const sideStyle = (active?: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)',
+    fontSize: 10, color: T.valueColor, fontFamily: T.font,
+    cursor: 'default', padding: '2px 4px', borderRadius: 3, minWidth: 28,
+  });
+
+  const SideVal: React.FC<{ val: string; onChange: (v: string) => void }> = ({ val, onChange }) => {
+    const [focused, setFocused] = useState(false);
+    const [draft, setDraft] = useState(val.replace('px', ''));
+    useEffect(() => { if (!focused) setDraft(val.replace('px', '')); }, [val, focused]);
+    return (
+      <input
+        value={draft}
+        onFocus={() => { setFocused(true); }}
+        onBlur={() => { setFocused(false); onChange(`${parseFloat(draft) || 0}px`); }}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') onChange(`${parseFloat(draft) || 0}px`); }}
+        style={{
+          width: 36, textAlign: 'center', background: focused ? T.inputBgFocus : T.inputBg,
+          border: focused ? T.inputBorderFocus : T.inputBorder, borderRadius: 4,
+          color: T.valueColor, fontSize: 10, fontFamily: T.font, outline: 'none', padding: '2px 2px',
+        }}
+      />
+    );
   };
 
-  const applyPreset = (name: string) => {
-    const preset = ANIMATION_PRESETS[name];
-    if (preset) {
-      setConfig({ ...DEFAULT_CONFIG, ...preset });
-      setSelectedPreset(name);
-    }
-  };
+  const numVal = (v: string) => parseFloat(v) || 0;
 
-  const buildAnimeParams = (targetEl: HTMLElement): Record<string, any> => {
-    const params: Record<string, any> = {};
-    if (config.opacity !== 1) params.opacity = [config.opacity, 1];
-    if (config.scale !== 1) params.scale = [config.scale, 1];
-    if (config.blur !== 0) params.filter = [`blur(${config.blur}px)`, 'blur(0px)'];
-    if (config.offsetX !== 0) params.translateX = [config.offsetX, 0];
-    if (config.offsetY !== 0) params.translateY = [config.offsetY, 0];
-    if (config.rotate !== 0) params.rotate = [`${config.rotate}deg`, '0deg'];
-    if (config.rotateMode === '3d') {
-      if (config.rotateX !== 0) params.rotateX = [`${config.rotateX}deg`, '0deg'];
-      if (config.rotateY !== 0) params.rotateY = [`${config.rotateY}deg`, '0deg'];
-    }
-    if (config.skewX !== 0) params.skewX = [`${config.skewX}deg`, '0deg'];
-    if (config.skewY !== 0) params.skewY = [`${config.skewY}deg`, '0deg'];
-    if (Object.keys(params).length === 0) params.opacity = [0, 1];
-
-    params.duration = config.duration;
-    params.delay = config.delay;
-    params.loop = config.infinite ? true : config.loop;
-    params.alternate = config.alternate;
-
-    if (config.easingType === 'spring') {
-      params.ease = spring(config.springConfig);
-    } else if (config.easingType === 'bezier') {
-      try {
-        const vals = config.customBezier.split(',').map(n => parseFloat(n.trim()));
-        if (vals.length === 4 && vals.every(v => !isNaN(v))) {
-          params.ease = cubicBezier(vals[0], vals[1], vals[2], vals[3]);
-        } else {
-          params.ease = 'outExpo';
-        }
-      } catch { params.ease = 'outExpo'; }
+  const handlePadding = (side: keyof SpacingValues, v: string) => {
+    if (paddingLinked) {
+      (['top', 'right', 'bottom', 'left'] as (keyof SpacingValues)[]).forEach(s => onPaddingChange(s, v));
     } else {
-      params.ease = config.easingName;
-    }
-    return params;
-  };
-
-  const runPreview = () => {
-    if (isPreviewing) {
-      stopPreview();
-      return;
-    }
-
-    // Save original styles
-    originalStyles.current = {
-      transform: element.style.transform,
-      opacity: element.style.opacity,
-      filter: element.style.filter,
-    };
-
-    setIsPreviewing(true);
-
-    const params = buildAnimeParams(element);
-    params.onComplete = () => {
-      if (!config.infinite && config.loop <= 1) {
-        setIsPreviewing(false);
-      }
-    };
-
-    try {
-      previewAnim.current = animate(element, params);
-    } catch (err) {
-      console.error('[Optate] Animation preview error:', err);
-      setIsPreviewing(false);
+      onPaddingChange(side, v);
     }
   };
 
-  const stopPreview = () => {
-    try {
-      if (previewAnim.current) {
-        remove(element);
-        previewAnim.current = null;
-      }
-    } catch {}
-    // Restore original styles
-    Object.entries(originalStyles.current).forEach(([prop, val]) => {
-      element.style[prop as any] = val;
-    });
-    setIsPreviewing(false);
-  };
-
-  const handleApply = () => {
-    stopPreview();
-
-    // Build CSS @keyframes from the config
-    const fromProps: string[] = [];
-    const toProps: string[] = [];
-    const transformFrom: string[] = [];
-
-    if (config.opacity !== 1) {
-      fromProps.push(`opacity: ${config.opacity}`);
-      toProps.push('opacity: 1');
+  const handleMargin = (side: keyof SpacingValues, v: string) => {
+    if (marginLinked) {
+      (['top', 'right', 'bottom', 'left'] as (keyof SpacingValues)[]).forEach(s => onMarginChange(s, v));
+    } else {
+      onMarginChange(side, v);
     }
-    if (config.blur !== 0) {
-      fromProps.push(`filter: blur(${config.blur}px)`);
-      toProps.push('filter: blur(0px)');
-    }
-    if (config.scale !== 1) transformFrom.push(`scale(${config.scale})`);
-    if (config.offsetX !== 0) transformFrom.push(`translateX(${config.offsetX}px)`);
-    if (config.offsetY !== 0) transformFrom.push(`translateY(${config.offsetY}px)`);
-    if (config.rotate !== 0) transformFrom.push(`rotate(${config.rotate}deg)`);
-    if (config.rotateMode === '3d') {
-      if (config.rotateX !== 0) transformFrom.push(`rotateX(${config.rotateX}deg)`);
-      if (config.rotateY !== 0) transformFrom.push(`rotateY(${config.rotateY}deg)`);
-    }
-    if (config.skewX !== 0) transformFrom.push(`skewX(${config.skewX}deg)`);
-    if (config.skewY !== 0) transformFrom.push(`skewY(${config.skewY}deg)`);
-
-    if (transformFrom.length > 0) {
-      fromProps.push(`transform: ${transformFrom.join(' ')}`);
-      toProps.push('transform: none');
-    }
-
-    // If nothing was set, default to fade
-    if (fromProps.length === 0) {
-      fromProps.push('opacity: 0');
-      toProps.push('opacity: 1');
-    }
-
-    // Generate a unique keyframe name
-    const animId = `optate-anim-${Date.now()}`;
-    const keyframeCSS = `@keyframes ${animId} {\n  from { ${fromProps.join('; ')}; }\n  to { ${toProps.join('; ')}; }\n}`;
-
-    // Inject keyframes into the page
-    let styleEl = document.getElementById('optate-animations') as HTMLStyleElement;
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = 'optate-animations';
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent += '\n' + keyframeCSS;
-
-    // Map easing to CSS timing function
-    let cssEasing = 'ease';
-    if (config.easingType === 'bezier') {
-      cssEasing = `cubic-bezier(${config.customBezier})`;
-    } else if (config.easingName.includes('ease') || config.easingName.includes('Cubic') || config.easingName.includes('Quad')) {
-      cssEasing = 'ease-in-out';
-    } else if (config.easingName.includes('In') && !config.easingName.includes('Out')) {
-      cssEasing = 'ease-in';
-    } else if (config.easingName.includes('Out') && !config.easingName.includes('In')) {
-      cssEasing = 'ease-out';
-    }
-
-    const iterationCount = config.infinite ? 'infinite' : String(config.loop);
-    const direction = config.alternate ? 'alternate' : 'normal';
-    const animValue = `${animId} ${config.duration}ms ${cssEasing} ${config.delay}ms ${iterationCount} ${direction} both`;
-
-    // Apply to element
-    const oldAnim = element.style.animation;
-    element.style.animation = animValue;
-    changeTracker.recordChange(element, 'style', 'animation', oldAnim || 'none', animValue);
-  };
-
-
-  const onMiniPreviewEnter = () => {
-    const el = miniPreviewRef.current;
-    if (!el) return;
-    // Reset any previous
-    try { remove(el); } catch {}
-    el.style.transform = '';
-    el.style.opacity = '1';
-    el.style.filter = '';
-
-    const params = buildAnimeParams(el);
-    params.onComplete = () => {}; // no-op for mini
-    try {
-      miniPreviewAnim.current = animate(el, params);
-    } catch (err) {
-      console.error('[Optate] Mini preview error:', err);
-    }
-  };
-
-  const onMiniPreviewLeave = () => {
-    const el = miniPreviewRef.current;
-    if (!el) return;
-    try { remove(el); } catch {}
-    el.style.transform = '';
-    el.style.opacity = '1';
-    el.style.filter = '';
-    miniPreviewAnim.current = null;
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '24px', overflow: 'hidden', minWidth: 0 }}>
-      {/* Live Mini Preview */}
-      <div
-        onMouseEnter={onMiniPreviewEnter}
-        onMouseLeave={onMiniPreviewLeave}
-        style={{
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px',
-          padding: '24px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100px',
-          cursor: 'pointer',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Hover hint */}
-        <div style={{
-          position: 'absolute', top: '8px', right: '10px',
-          fontSize: '8px', color: 'rgba(255,255,255,0.15)',
-          textTransform: 'uppercase', letterSpacing: '0.5px',
+    <div style={{ fontFamily: T.font }}>
+      {/* Visual box */}
+      <div style={{
+        position: 'relative', border: '1.5px dashed rgba(249,115,22,0.4)', borderRadius: 6,
+        padding: 8, marginBottom: 10,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+          <SideVal val={margin.top} onChange={v => handleMargin('top', v)} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <SideVal val={margin.left} onChange={v => handleMargin('left', v)} />
+          {/* Inner padding box */}
+          <div style={{
+            flex: 1, border: '1.5px dashed rgba(52,211,153,0.4)', borderRadius: 4, padding: 6,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+              <SideVal val={padding.top} onChange={v => handlePadding('top', v)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <SideVal val={padding.left} onChange={v => handlePadding('left', v)} />
+              <div style={{ fontSize: 9, color: T.labelColor, textAlign: 'center', lineHeight: 1 }}>content</div>
+              <SideVal val={padding.right} onChange={v => handlePadding('right', v)} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+              <SideVal val={padding.bottom} onChange={v => handlePadding('bottom', v)} />
+            </div>
+          </div>
+          <SideVal val={margin.right} onChange={v => handleMargin('right', v)} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+          <SideVal val={margin.bottom} onChange={v => handleMargin('bottom', v)} />
+        </div>
+        {/* Labels */}
+        <div style={{ position: 'absolute', top: 2, left: 4, fontSize: 9, color: 'rgba(249,115,22,0.6)' }}>margin</div>
+        <div style={{ position: 'absolute', top: 32, left: 20, fontSize: 9, color: 'rgba(52,211,153,0.6)' }}>padding</div>
+      </div>
+      {/* Link toggles */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+        <button onClick={() => setPaddingLinked(!paddingLinked)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+          cursor: 'pointer', fontSize: 10, color: paddingLinked ? T.accent : T.labelColor, fontFamily: T.font,
         }}>
-          Hover to preview
-        </div>
-
-        {/* Animated element */}
-        <div ref={miniPreviewRef} style={{ willChange: 'transform, opacity, filter' }}>
-          {isTextElement ? (
-            <div style={{
-              fontSize: '22px', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
-              fontFamily: 'inherit', letterSpacing: '-0.3px',
-            }}>
-              Hello World
-            </div>
-          ) : (
-            <div style={{
-              width: '80px', height: '60px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3))',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }} />
-          )}
-        </div>
-      </div>
-
-      {/* Presets */}
-      <div>
-        <SectionTitle>Presets</SectionTitle>
-        <select
-          value={selectedPreset}
-          onChange={e => {
-            const val = e.target.value;
-            setSelectedPreset(val);
-            if (val) {
-              applyPreset(val);
-            }
-          }}
-          style={{
-            width: '100%', background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
-            padding: '7px 8px', fontSize: '11px', color: '#fff',
-            outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            marginTop: '6px'
-          }}
-        >
-          <option value="" style={{ background: '#1a1a1a', color: 'rgba(255,255,255,0.4)' }}>Custom / None</option>
-          {Object.keys(ANIMATION_PRESETS).map(name => (
-            <option key={name} value={name} style={{ background: '#1a1a1a', color: '#fff' }}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <Divider />
-
-      {/* Properties */}
-      <div>
-        <SectionTitle>Properties</SectionTitle>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-          <SliderRow label="Opacity" value={config.opacity} min={0} max={1} step={0.01} onChange={v => updateConfig({ opacity: v })} />
-          <SliderRow label="Scale" value={config.scale} min={0} max={3} step={0.05} onChange={v => updateConfig({ scale: v })} />
-          <SliderRow label="Blur" value={config.blur} min={0} max={20} unit="px" onChange={v => updateConfig({ blur: v })} />
-          
-          {/* Rotate */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div style={labelStyle}>Rotate</div>
-              <div style={{ width: '80px' }}>
-                <SegmentedToggle options={['2D', '3D']} value={config.rotateMode === '2d' ? '2D' : '3D'} onChange={v => updateConfig({ rotateMode: v === '2D' ? '2d' : '3d' })} />
-              </div>
-            </div>
-            {config.rotateMode === '2d' ? (
-              <SliderRow label="Rotation" value={config.rotate} min={-360} max={360} unit="°" onChange={v => updateConfig({ rotate: v })} />
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px', borderLeft: '2px solid rgba(59,130,246,0.2)' }}>
-                <SliderRow label="Rotate X" value={config.rotateX} min={-360} max={360} unit="°" onChange={v => updateConfig({ rotateX: v })} />
-                <SliderRow label="Rotate Y" value={config.rotateY} min={-360} max={360} unit="°" onChange={v => updateConfig({ rotateY: v })} />
-                <SliderRow label="Rotate Z" value={config.rotate} min={-360} max={360} unit="°" onChange={v => updateConfig({ rotate: v })} />
-              </div>
-            )}
-          </div>
-
-          <DualAxisRow label="Skew" x={config.skewX} y={config.skewY} onChangeX={v => updateConfig({ skewX: v })} onChangeY={v => updateConfig({ skewY: v })} />
-          <DualAxisRow label="Offset" x={config.offsetX} y={config.offsetY} onChangeX={v => updateConfig({ offsetX: v })} onChangeY={v => updateConfig({ offsetY: v })} />
-        </div>
-      </div>
-
-      <Divider />
-
-      {/* Transition / Easing */}
-      <div>
-        <SectionTitle>Transition</SectionTitle>
-        <div style={{ marginTop: '6px', marginBottom: '10px' }}>
-          <SegmentedToggle options={['Ease', 'Spring', 'Bezier']} value={config.easingType === 'ease' ? 'Ease' : config.easingType === 'spring' ? 'Spring' : 'Bezier'} onChange={v => updateConfig({ easingType: v === 'Ease' ? 'ease' : v === 'Spring' ? 'spring' : 'bezier' })} />
-        </div>
-
-        {/* Easing Curve Preview */}
-        <EasingCurvePreview config={config} onBezierChange={bezier => updateConfig({ customBezier: bezier })} />
-        
-        <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '10px', padding: '12px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '8px' }}>
-          {config.easingType === 'ease' && (
-            <select
-              value={config.easingName}
-              onChange={e => updateConfig({ easingName: e.target.value })}
-              style={{
-                width: '100%', background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
-                padding: '7px 8px', fontSize: '11px', color: '#fff',
-                outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              {Object.entries(EASING_CATEGORIES).map(([cat, eases]) => (
-                <optgroup key={cat} label={cat} style={{ background: '#1a1a1a' }}>
-                  {eases.map(e => <option key={e} value={e} style={{ background: '#1a1a1a', color: '#fff' }}>{e}</option>)}
-                </optgroup>
-              ))}
-            </select>
-          )}
-
-          {config.easingType === 'spring' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <SliderRow label="Mass" value={config.springConfig.mass} min={0.1} max={10} step={0.1} onChange={v => updateConfig({ springConfig: { ...config.springConfig, mass: v } })} />
-              <SliderRow label="Stiffness" value={config.springConfig.stiffness} min={1} max={1000} step={10} onChange={v => updateConfig({ springConfig: { ...config.springConfig, stiffness: v } })} />
-              <SliderRow label="Damping" value={config.springConfig.damping} min={1} max={100} step={1} onChange={v => updateConfig({ springConfig: { ...config.springConfig, damping: v } })} />
-              <SliderRow label="Bounce" value={config.springConfig.bounce} min={0} max={1} step={0.01} onChange={v => updateConfig({ springConfig: { ...config.springConfig, bounce: v } })} />
-              <SliderRow label="Duration" value={config.springConfig.duration} min={0} max={5000} step={50} unit="ms" onChange={v => updateConfig({ springConfig: { ...config.springConfig, duration: v } })} />
-              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontStyle: 'italic', marginTop: '2px' }}>
-                Anime.js v4 Spring Physics Engine
-              </div>
-            </div>
-          )}
-
-          {config.easingType === 'bezier' && (
-            <div>
-              <div style={{ ...labelStyle, marginBottom: '6px' }}>Cubic Bezier</div>
-              <input
-                value={config.customBezier}
-                onChange={e => updateConfig({ customBezier: e.target.value })}
-                placeholder="0.42, 0, 1, 1"
-                style={{ ...inputStyle, fontFamily: 'monospace' }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <Divider />
-
-      {/* Timing */}
-      <div>
-        <SectionTitle>Timing</SectionTitle>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-          <SliderRow label="Duration" value={config.duration} min={100} max={5000} step={50} unit="ms" onChange={v => updateConfig({ duration: v })} />
-          <SliderRow label="Delay" value={config.delay} min={0} max={5000} step={50} unit="ms" onChange={v => updateConfig({ delay: v })} />
-          
-          {/* Loop */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={labelStyle}>Loop</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => updateConfig({ infinite: !config.infinite })}
-                style={{
-                  padding: '4px 10px', borderRadius: '6px', fontSize: '10px',
-                  border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  transition: 'all 0.15s ease',
-                  background: config.infinite ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.04)',
-                  color: config.infinite ? '#60a5fa' : 'rgba(255,255,255,0.4)',
-                }}
-              >∞</button>
-              {!config.infinite && (
-                <NumberStepper value={config.loop} min={1} onChange={v => updateConfig({ loop: v })} />
-              )}
-            </div>
-          </div>
-
-          {/* Alternate */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={labelStyle}>Alternate</div>
-            <button
-              onClick={() => updateConfig({ alternate: !config.alternate })}
-              style={{
-                width: '36px', height: '20px', borderRadius: '10px', border: 'none',
-                cursor: 'pointer', position: 'relative', transition: 'all 0.2s ease',
-                background: config.alternate ? '#3b82f6' : 'rgba(255,255,255,0.1)',
-              }}
-            >
-              <div style={{
-                position: 'absolute', top: '3px', width: '14px', height: '14px',
-                borderRadius: '50%', background: '#fff', transition: 'all 0.2s ease',
-                left: config.alternate ? '19px' : '3px',
-              }} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
-        <button
-          onClick={runPreview}
-          style={{
-            padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
-            border: isPreviewing ? '1px solid rgba(239,68,68,0.3)' : 'none',
-            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s ease',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            background: isPreviewing ? 'rgba(239,68,68,0.15)' : '#3b82f6',
-            color: isPreviewing ? '#f87171' : '#fff',
-          }}
-        >
-          {isPreviewing ? (
-            <>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f87171' }} />
-              Stop
-            </>
-          ) : (
-            <>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-              Preview
-            </>
-          )}
+          <LinkIcon linked={paddingLinked} /> Link padding
         </button>
-        <button
-          onClick={handleApply}
-          style={{
-            padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
-            border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-            fontFamily: 'inherit', transition: 'all 0.15s ease',
-            background: 'rgba(255,255,255,0.05)', color: '#fff',
-          }}
-        >
-          Apply CSS
+        <button onClick={() => setMarginLinked(!marginLinked)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+          cursor: 'pointer', fontSize: 10, color: marginLinked ? T.accentOrange : T.labelColor, fontFamily: T.font,
+        }}>
+          <LinkIcon linked={marginLinked} /> Link margin
         </button>
       </div>
     </div>
   );
 };
 
-const AnimationIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-  </svg>
-);
+// ─── Main EditorPanel ────────────────────────────────────────────────────────
+
+export const EditorPanel: React.FC = () => {
+  const { selectedElement: el, isEditing, setIsEditing, viewportMode } = useSelection();
+  const [panelSide, setPanelSide] = useState<'left' | 'right'>('right');
+  const [mounted, setMounted] = useState(false);
+
+  // Slide-in on mount
+  useEffect(() => {
+    if (isEditing) requestAnimationFrame(() => setMounted(true));
+    else setMounted(false);
+  }, [isEditing]);
+
+  // ── per-section state ──────────────────────────────────────────────────────
+
+  // Dimensions
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
+  const [minW, setMinW] = useState('');
+  const [minH, setMinH] = useState('');
+  const [maxW, setMaxW] = useState('');
+  const [maxH, setMaxH] = useState('');
+  const [aspectLocked, setAspectLocked] = useState(false);
+  const aspectRef = useRef(1);
+
+  // Position
+  const [position, setPosition] = useState('static');
+  const [posLeft, setPosLeft] = useState('');
+  const [posTop, setPosTop] = useState('');
+  const [zIndex, setZIndex] = useState('');
+
+  // Spacing
+  const [padding, setPadding] = useState<SpacingValues>({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
+  const [margin, setMargin] = useState<SpacingValues>({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
+
+  // Fill
+  const [bgColor, setBgColor] = useState('transparent');
+  const [bgImage, setBgImage] = useState('none');
+  const [bgSize, setBgSize] = useState('cover');
+  const [bgPosition, setBgPosition] = useState('center');
+
+  // Border
+  const [borderWidth, setBorderWidth] = useState('0');
+  const [borderStyle, setBorderStyle] = useState('solid');
+  const [borderColor, setBorderColor] = useState('#000000');
+  const [radiusLinked, setRadiusLinked] = useState(true);
+  const [radius, setRadius] = useState({ tl: '0', tr: '0', br: '0', bl: '0' });
+
+  // Typography
+  const [fontFamily, setFontFamily] = useState('Inter');
+  const [fontSize, setFontSize] = useState('16');
+  const [fontWeight, setFontWeight] = useState('400');
+  const [lineHeight, setLineHeight] = useState('1.5');
+  const [letterSpacing, setLetterSpacing] = useState('0');
+  const [textColor, setTextColor] = useState('#000000');
+  const [textAlign, setTextAlign] = useState('left');
+  const [textTransform, setTextTransform] = useState('none');
+  const [textDecoration, setTextDecoration] = useState('none');
+
+  // Effects
+  const [opacity, setOpacity] = useState('100');
+  const [shadowEnabled, setShadowEnabled] = useState(false);
+  const [shadowX, setShadowX] = useState('0');
+  const [shadowY, setShadowY] = useState('4');
+  const [shadowBlur, setShadowBlur] = useState('8');
+  const [shadowSpread, setShadowSpread] = useState('0');
+  const [shadowColor, setShadowColor] = useState('#000000');
+  const [backdropBlur, setBackdropBlur] = useState('0');
+  const [filterBlur, setFilterBlur] = useState('0');
+  const [blendMode, setBlendMode] = useState('normal');
+
+  // Transform
+  const [rotate, setRotate] = useState('0');
+  const [scaleX, setScaleX] = useState('1');
+  const [translateX, setTranslateX] = useState('0');
+  const [translateY, setTranslateY] = useState('0');
+
+  // ── Read computed styles on element change ────────────────────────────────
+
+  useEffect(() => {
+    if (!el) return;
+    const cs = window.getComputedStyle(el);
+
+    // Dimensions
+    setWidth(cs.width || '');
+    setHeight(cs.height || '');
+    setMinW(cs.minWidth || '');
+    setMinH(cs.minHeight || '');
+    setMaxW(cs.maxWidth || '');
+    setMaxH(cs.maxHeight || '');
+
+    const w = parseFloat(cs.width) || 1;
+    const h = parseFloat(cs.height) || 1;
+    aspectRef.current = w / h;
+
+    // Position
+    setPosition(cs.position || 'static');
+    setPosLeft(cs.left || '0px');
+    setPosTop(cs.top || '0px');
+    setZIndex(cs.zIndex === 'auto' ? '' : cs.zIndex || '');
+
+    // Spacing
+    setPadding({
+      top: cs.paddingTop || '0px', right: cs.paddingRight || '0px',
+      bottom: cs.paddingBottom || '0px', left: cs.paddingLeft || '0px',
+    });
+    setMargin({
+      top: cs.marginTop || '0px', right: cs.marginRight || '0px',
+      bottom: cs.marginBottom || '0px', left: cs.marginLeft || '0px',
+    });
+
+    // Fill
+    setBgColor(cs.backgroundColor || 'transparent');
+    setBgImage(cs.backgroundImage || 'none');
+    setBgSize(cs.backgroundSize || 'cover');
+    setBgPosition(cs.backgroundPosition || 'center');
+
+    // Border
+    setBorderWidth((parseFloat(cs.borderTopWidth) || 0).toString());
+    setBorderStyle(cs.borderTopStyle || 'solid');
+    setBorderColor(toHex(cs.borderTopColor || '#000000'));
+    const br = cs.borderRadius || '0px';
+    const bAll = parseFloat(br) || 0;
+    setRadius({ tl: bAll.toString(), tr: bAll.toString(), br: bAll.toString(), bl: bAll.toString() });
+
+    // Typography
+    setFontFamily(cs.fontFamily?.split(',')[0]?.replace(/['"]/g, '').trim() || 'Inter');
+    setFontSize((parseFloat(cs.fontSize) || 16).toString());
+    setFontWeight(cs.fontWeight || '400');
+    setLineHeight(cs.lineHeight || '1.5');
+    setLetterSpacing((parseFloat(cs.letterSpacing) || 0).toString());
+    setTextColor(toHex(cs.color || '#000000'));
+    setTextAlign(cs.textAlign || 'left');
+    setTextTransform(cs.textTransform || 'none');
+    setTextDecoration(cs.textDecorationLine || 'none');
+
+    // Effects
+    setOpacity(Math.round((parseFloat(cs.opacity) || 1) * 100).toString());
+    const shadow = cs.boxShadow;
+    if (shadow && shadow !== 'none') {
+      setShadowEnabled(true);
+      const m = shadow.match(/([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px/);
+      if (m) { setShadowX(m[1]); setShadowY(m[2]); setShadowBlur(m[3]); setShadowSpread(m[4]); }
+    } else {
+      setShadowEnabled(false);
+    }
+    const bdFilter = cs.backdropFilter || '';
+    const bBlurM = bdFilter.match(/blur\(([\d.]+)px\)/);
+    setBackdropBlur(bBlurM ? bBlurM[1] : '0');
+    const filt = cs.filter || '';
+    const fBlurM = filt.match(/blur\(([\d.]+)px\)/);
+    setFilterBlur(fBlurM ? fBlurM[1] : '0');
+    setBlendMode(cs.mixBlendMode || 'normal');
+
+    // Transform
+    const transform = cs.transform || 'none';
+    if (transform !== 'none') {
+      const matrixMatch = transform.match(/matrix\(([^)]+)\)/);
+      if (matrixMatch) {
+        const [a, b, c, d, e, f] = matrixMatch[1].split(',').map(Number);
+        setScaleX((Math.sqrt(a * a + b * b)).toFixed(2));
+        setRotate((Math.atan2(b, a) * (180 / Math.PI)).toFixed(1));
+        setTranslateX(e.toFixed(0));
+        setTranslateY(f.toFixed(0));
+      }
+    } else {
+      setRotate('0'); setScaleX('1'); setTranslateX('0'); setTranslateY('0');
+    }
+  }, [el]);
+
+  // ── applyProp helper ──────────────────────────────────────────────────────
+
+  const applyProp = useCallback((prop: string, val: string) => {
+    if (!el) return;
+    const old = window.getComputedStyle(el).getPropertyValue(prop);
+    applyStyle(el, prop, val);
+    changeTracker.recordChange(el, 'style', prop, old, val);
+  }, [el]);
+
+  // ── Section handlers ──────────────────────────────────────────────────────
+
+  // Dimensions
+  const handleWidth = (v: string) => {
+    setWidth(v);
+    applyProp('width', v);
+    if (aspectLocked) {
+      const h = `${parseFloat(v) / aspectRef.current}px`;
+      setHeight(h); applyProp('height', h);
+    }
+  };
+  const handleHeight = (v: string) => {
+    setHeight(v);
+    applyProp('height', v);
+    if (aspectLocked) {
+      const w = `${parseFloat(v) * aspectRef.current}px`;
+      setWidth(w); applyProp('width', w);
+    }
+  };
+
+  // Position
+  const handlePosition = (v: string) => { setPosition(v); applyProp('position', v); };
+  const handlePosLeft = (v: string) => { setPosLeft(v); applyProp('left', v); };
+  const handlePosTop = (v: string) => { setPosTop(v); applyProp('top', v); };
+  const handleZIndex = (v: string) => { setZIndex(v); applyProp('z-index', v); };
+
+  // Spacing
+  const handlePaddingChange = (side: keyof SpacingValues, v: string) => {
+    setPadding(p => ({ ...p, [side]: v }));
+    applyProp(`padding-${side}`, v);
+  };
+  const handleMarginChange = (side: keyof SpacingValues, v: string) => {
+    setMargin(m => ({ ...m, [side]: v }));
+    applyProp(`margin-${side}`, v);
+  };
+
+  // Fill
+  const handleBgColor = (v: string) => { setBgColor(v); applyProp('background-color', v); };
+  const handleBgSize = (v: string) => { setBgSize(v); applyProp('background-size', v); };
+  const handleBgPosition = (v: string) => { setBgPosition(v); applyProp('background-position', v); };
+
+  // Border
+  const handleBorderWidth = (v: string) => { setBorderWidth(v.replace('px', '')); applyProp('border-width', `${v.replace('px', '')}px`); };
+  const handleBorderStyle = (v: string) => { setBorderStyle(v); applyProp('border-style', v); };
+  const handleBorderColor = (v: string) => { setBorderColor(v); applyProp('border-color', v); };
+  const handleRadius = (corner: keyof typeof radius, v: string) => {
+    if (radiusLinked) {
+      const newR = { tl: v, tr: v, br: v, bl: v };
+      setRadius(newR);
+      applyProp('border-radius', `${v}px`);
+    } else {
+      const newR = { ...radius, [corner]: v };
+      setRadius(newR);
+      applyProp('border-radius', `${newR.tl}px ${newR.tr}px ${newR.br}px ${newR.bl}px`);
+    }
+  };
+
+  // Typography
+  const handleFontFamily = (v: string) => {
+    setFontFamily(v); loadGoogleFont(v); applyProp('font-family', `'${v}', sans-serif`);
+  };
+  const handleFontSize = (v: string) => { setFontSize(v.replace('px', '')); applyProp('font-size', `${v.replace('px', '')}px`); };
+  const handleFontWeight = (v: string) => { setFontWeight(v); applyProp('font-weight', v); };
+  const handleLineHeight = (v: string) => { setLineHeight(v); applyProp('line-height', v); };
+  const handleLetterSpacing = (v: string) => { setLetterSpacing(v.replace('em', '')); applyProp('letter-spacing', `${v.replace('em', '')}em`); };
+  const handleTextColor = (v: string) => { setTextColor(v); applyProp('color', v); };
+  const handleTextAlign = (v: string) => { setTextAlign(v); applyProp('text-align', v); };
+  const handleTextTransform = (v: string) => { setTextTransform(v); applyProp('text-transform', v); };
+  const handleTextDecoration = (v: string) => { setTextDecoration(v); applyProp('text-decoration', v); };
+
+  // Effects
+  const handleOpacity = (v: string) => { setOpacity(v); applyProp('opacity', (parseFloat(v) / 100).toString()); };
+  const buildShadow = (x = shadowX, y = shadowY, b = shadowBlur, s = shadowSpread, c = shadowColor) =>
+    `${x}px ${y}px ${b}px ${s}px ${c}`;
+  const handleShadowToggle = (checked: boolean) => {
+    setShadowEnabled(checked);
+    applyProp('box-shadow', checked ? buildShadow() : 'none');
+  };
+  const handleShadowX = (v: string) => { setShadowX(v.replace('px', '')); applyProp('box-shadow', buildShadow(v.replace('px', ''))); };
+  const handleShadowY = (v: string) => { setShadowY(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, v.replace('px', ''))); };
+  const handleShadowBlur = (v: string) => { setShadowBlur(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, undefined, v.replace('px', ''))); };
+  const handleShadowSpread = (v: string) => { setShadowSpread(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, undefined, undefined, v.replace('px', ''))); };
+  const handleShadowColor = (v: string) => { setShadowColor(v); applyProp('box-shadow', buildShadow(undefined, undefined, undefined, undefined, v)); };
+  const handleBackdropBlur = (v: string) => { setBackdropBlur(v.replace('px', '')); applyProp('backdrop-filter', `blur(${v.replace('px', '')}px)`); };
+  const handleFilterBlur = (v: string) => { setFilterBlur(v.replace('px', '')); applyProp('filter', `blur(${v.replace('px', '')}px)`); };
+  const handleBlendMode = (v: string) => { setBlendMode(v); applyProp('mix-blend-mode', v); };
+
+  // Transform
+  const buildTransform = (r = rotate, sx = scaleX, tx = translateX, ty = translateY) =>
+    `rotate(${r}deg) scaleX(${sx}) translate(${tx}px, ${ty}px)`;
+  const handleRotate = (v: string) => { setRotate(v.replace('deg', '')); applyProp('transform', buildTransform(v.replace('deg', ''))); };
+  const handleScaleX = (v: string) => { setScaleX(v); applyProp('transform', buildTransform(undefined, v)); };
+  const handleTranslateX = (v: string) => { setTranslateX(v.replace('px', '')); applyProp('transform', buildTransform(undefined, undefined, v.replace('px', ''))); };
+  const handleTranslateY = (v: string) => { setTranslateY(v.replace('px', '')); applyProp('transform', buildTransform(undefined, undefined, undefined, v.replace('px', ''))); };
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  const handleClose = () => {
+    setMounted(false);
+    setTimeout(() => setIsEditing(false), 220);
+  };
+
+  const handleDelete = () => {
+    if (!el?.parentElement) return;
+    const parent = el.parentElement;
+    const oldHtml = parent.innerHTML;
+    el.remove();
+    changeTracker.recordChange(parent, 'html', 'removeNode', oldHtml, parent.innerHTML);
+    setIsEditing(false);
+  };
+
+  const handleFlip = () => setPanelSide(s => s === 'right' ? 'left' : 'right');
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  if (!isEditing || !el) return null;
+
+  const tag = el.tagName.toLowerCase();
+  const componentName = getFiberComponentName(el);
+  const isTextTag = TEXT_TAGS.includes(tag);
+
+  const panelStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 12,
+    bottom: 12,
+    [panelSide]: 12,
+    width: 260,
+    zIndex: 2147483642,
+    background: T.panelBg,
+    backdropFilter: 'blur(40px) saturate(180%)',
+    border: T.border,
+    borderRadius: 18,
+    boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: T.font,
+    overflow: 'hidden',
+    transform: mounted ? 'translateX(0)' : `translateX(${panelSide === 'right' ? '120%' : '-120%'})`,
+    transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={panelStyle}>
+      {/* ── Header ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px', borderBottom: T.border, flexShrink: 0,
+        background: 'rgba(255,255,255,0.02)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.accent, flexShrink: 0, boxShadow: `0 0 6px ${T.accent}` }} />
+          <div style={{ minWidth: 0 }}>
+            <span style={{ fontSize: 12, color: T.valueColor, fontWeight: 600, fontFamily: T.font }}>
+              {'<'}{tag}{'>'}
+            </span>
+            {componentName && (
+              <span style={{ fontSize: 10, color: T.labelColor, display: 'block', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {componentName}
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+          <IconBtn onClick={handleDelete} title="Delete element" danger>
+            <DeleteIcon />
+          </IconBtn>
+          <IconBtn onClick={handleFlip} title="Move panel to other side">
+            <FlipIcon />
+          </IconBtn>
+          <IconBtn onClick={handleClose} title="Close panel">
+            <CloseIcon />
+          </IconBtn>
+        </div>
+      </div>
+
+      {/* ── Scrollable content ── */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+
+        {/* ─ Section 1: Dimensions ─ */}
+        <Section title="Dimensions">
+          {/* W / H with aspect lock */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8 }}>
+            <ScrubInput label="W" value={width.replace('px', '')} unit="px" onChange={handleWidth} min={0} />
+            <button
+              onClick={() => setAspectLocked(!aspectLocked)}
+              title="Lock aspect ratio"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+                marginBottom: 2, color: aspectLocked ? T.accent : T.labelColor,
+              }}
+            >
+              <LinkIcon linked={aspectLocked} />
+            </button>
+            <ScrubInput label="H" value={height.replace('px', '')} unit="px" onChange={handleHeight} min={0} />
+          </div>
+          <Row2
+            a={{ label: 'Min W', value: minW.replace('px', ''), unit: 'px', onChange: v => { setMinW(v); applyProp('min-width', v); } }}
+            b={{ label: 'Min H', value: minH.replace('px', ''), unit: 'px', onChange: v => { setMinH(v); applyProp('min-height', v); } }}
+          />
+          <Row2
+            a={{ label: 'Max W', value: maxW === 'none' ? '' : maxW.replace('px', ''), unit: 'px', onChange: v => { setMaxW(v); applyProp('max-width', v || 'none'); } }}
+            b={{ label: 'Max H', value: maxH === 'none' ? '' : maxH.replace('px', ''), unit: 'px', onChange: v => { setMaxH(v); applyProp('max-height', v || 'none'); } }}
+          />
+        </Section>
+
+        {/* ─ Section 2: Position ─ */}
+        <Section title="Position">
+          <div style={{ marginBottom: 8 }}>
+            <Segmented
+              value={position}
+              onChange={handlePosition}
+              options={[
+                { label: 'Static', value: 'static' },
+                { label: 'Rel', value: 'relative' },
+                { label: 'Abs', value: 'absolute' },
+                { label: 'Fixed', value: 'fixed' },
+                { label: 'Sticky', value: 'sticky' },
+              ]}
+            />
+          </div>
+          {position !== 'static' && (
+            <>
+              <Row2
+                a={{ label: 'X (left)', value: posLeft.replace('px', ''), unit: 'px', onChange: handlePosLeft }}
+                b={{ label: 'Y (top)', value: posTop.replace('px', ''), unit: 'px', onChange: handlePosTop }}
+              />
+              <div style={{ marginTop: 4 }}>
+                <ScrubInput label="Z-Index" value={zIndex} unit="" onChange={handleZIndex} step={1} />
+              </div>
+            </>
+          )}
+        </Section>
+
+        {/* ─ Section 3: Spacing ─ */}
+        <Section title="Spacing">
+          <BoxModelWidget
+            padding={padding}
+            margin={margin}
+            onPaddingChange={handlePaddingChange}
+            onMarginChange={handleMarginChange}
+          />
+        </Section>
+
+        {/* ─ Section 4: Fill & Background ─ */}
+        <Section title="Fill & Background">
+          <div style={{ marginBottom: 8 }}>
+            <FieldLabel>Background Color</FieldLabel>
+            <ColorSwatch value={bgColor} onChange={handleBgColor} />
+          </div>
+          {bgImage !== 'none' && (
+            <>
+              <div style={{ marginBottom: 8 }}>
+                <FieldLabel>Background Size</FieldLabel>
+                <Segmented
+                  value={bgSize}
+                  onChange={handleBgSize}
+                  options={[{ label: 'Cover', value: 'cover' }, { label: 'Contain', value: 'contain' }, { label: 'Auto', value: 'auto' }]}
+                />
+              </div>
+              <div>
+                <FieldLabel>Position</FieldLabel>
+                <input
+                  value={bgPosition}
+                  onChange={e => { setBgPosition(e.target.value); applyProp('background-position', e.target.value); }}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: T.inputBg, border: T.inputBorder, borderRadius: 6,
+                    color: T.valueColor, fontSize: 12, fontFamily: T.font,
+                    padding: '5px 8px', outline: 'none',
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </Section>
+
+        {/* ─ Section 5: Border ─ */}
+        <Section title="Border">
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginBottom: 8 }}>
+            <ScrubInput label="Width" value={borderWidth} unit="px" onChange={handleBorderWidth} min={0} />
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Style</FieldLabel>
+              <SmallSelect
+                value={borderStyle}
+                onChange={handleBorderStyle}
+                options={['none', 'solid', 'dashed', 'dotted', 'double']}
+              />
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <FieldLabel>Color</FieldLabel>
+              <div style={{ position: 'relative', width: 28, height: 28 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 5, background: borderColor, border: T.inputBorder }} />
+                <input type="color" value={borderColor} onChange={e => handleBorderColor(e.target.value)}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+              </div>
+            </div>
+          </div>
+          {/* Border radius */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {radiusLinked ? (
+              <ScrubInput label="Radius" value={radius.tl} unit="px" onChange={v => handleRadius('tl', v.replace('px', ''))} min={0} />
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, flex: 1 }}>
+                {([['tl', 'TL'], ['tr', 'TR'], ['bl', 'BL'], ['br', 'BR']] as [keyof typeof radius, string][]).map(([k, l]) => (
+                  <ScrubInput key={k} label={l} value={radius[k]} unit="px" onChange={v => handleRadius(k, v.replace('px', ''))} min={0} />
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setRadiusLinked(!radiusLinked)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, marginTop: 16 }}
+            >
+              <LinkIcon linked={radiusLinked} />
+            </button>
+          </div>
+        </Section>
+
+        {/* ─ Section 6: Typography ─ */}
+        <Section title="Typography" defaultOpen={isTextTag}>
+          <div style={{ marginBottom: 8 }}>
+            <FieldLabel>Font Family</FieldLabel>
+            <SmallSelect value={fontFamily} onChange={handleFontFamily} options={GOOGLE_FONTS} />
+          </div>
+          <Row2
+            a={{
+              label: 'Size', value: fontSize, unit: 'px',
+              onChange: v => { setFontSize(v.replace('px', '')); handleFontSize(v); },
+            }}
+            b={{
+              label: 'Weight', value: fontWeight, unit: '',
+              onChange: v => handleFontWeight(v),
+            }}
+          />
+          <div style={{ marginBottom: 8 }}>
+            <SmallSelect
+              value={fontWeight}
+              onChange={handleFontWeight}
+              options={['100', '200', '300', '400', '500', '600', '700', '800', '900'].map(w => ({ label: `${w}`, value: w }))}
+            />
+          </div>
+          <Row2
+            a={{ label: 'Line H', value: lineHeight, unit: '', onChange: handleLineHeight }}
+            b={{ label: 'Letter S', value: letterSpacing, unit: 'em', onChange: handleLetterSpacing }}
+          />
+          <div style={{ marginBottom: 8 }}>
+            <FieldLabel>Color</FieldLabel>
+            <ColorSwatch value={textColor} onChange={handleTextColor} />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <FieldLabel>Align</FieldLabel>
+            <Segmented
+              value={textAlign}
+              onChange={handleTextAlign}
+              options={[
+                { label: '⬛ L', value: 'left' },
+                { label: '— C', value: 'center' },
+                { label: 'R ⬛', value: 'right' },
+                { label: '= J', value: 'justify' },
+              ]}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <FieldLabel>Transform</FieldLabel>
+            <Segmented
+              value={textTransform}
+              onChange={handleTextTransform}
+              options={[
+                { label: 'none', value: 'none' },
+                { label: 'AA', value: 'uppercase' },
+                { label: 'aa', value: 'lowercase' },
+                { label: 'Aa', value: 'capitalize' },
+              ]}
+            />
+          </div>
+          <div>
+            <FieldLabel>Decoration</FieldLabel>
+            <Segmented
+              value={textDecoration}
+              onChange={handleTextDecoration}
+              options={[
+                { label: 'none', value: 'none' },
+                { label: 'U̲', value: 'underline' },
+                { label: 'S̶', value: 'line-through' },
+              ]}
+            />
+          </div>
+        </Section>
+
+        {/* ─ Section 7: Effects ─ */}
+        <Section title="Effects">
+          {/* Opacity */}
+          <div style={{ marginBottom: 10 }}>
+            <FieldLabel>Opacity</FieldLabel>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="range" min={0} max={100} value={opacity}
+                onChange={e => handleOpacity(e.target.value)}
+                style={{ flex: 1, accentColor: T.accent }}
+              />
+              <input
+                type="text" value={opacity}
+                onChange={e => handleOpacity(e.target.value)}
+                style={{
+                  width: 44, background: T.inputBg, border: T.inputBorder, borderRadius: 6,
+                  color: T.valueColor, fontSize: 12, fontFamily: T.font, padding: '3px 6px', outline: 'none', textAlign: 'center',
+                }}
+              />
+              <span style={{ fontSize: 10, color: T.labelColor }}>%</span>
+            </div>
+          </div>
+          {/* Box shadow */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <FieldLabel>Box Shadow</FieldLabel>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                <input type="checkbox" checked={shadowEnabled} onChange={e => handleShadowToggle(e.target.checked)}
+                  style={{ accentColor: T.accent }} />
+                <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font }}>Enable</span>
+              </label>
+            </div>
+            {shadowEnabled && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                  <ScrubInput label="X" value={shadowX} unit="px" onChange={handleShadowX} />
+                  <ScrubInput label="Y" value={shadowY} unit="px" onChange={handleShadowY} />
+                  <ScrubInput label="Blur" value={shadowBlur} unit="px" onChange={handleShadowBlur} min={0} />
+                  <ScrubInput label="Spread" value={shadowSpread} unit="px" onChange={handleShadowSpread} />
+                </div>
+                <ColorSwatch value={shadowColor} onChange={handleShadowColor} />
+              </>
+            )}
+          </div>
+          {/* Backdrop blur */}
+          <div style={{ marginBottom: 8 }}>
+            <ScrubInput label="Backdrop Blur" value={backdropBlur} unit="px" onChange={handleBackdropBlur} min={0} />
+          </div>
+          {/* Filter blur */}
+          <div style={{ marginBottom: 8 }}>
+            <ScrubInput label="Filter Blur" value={filterBlur} unit="px" onChange={handleFilterBlur} min={0} />
+          </div>
+          {/* Blend mode */}
+          <div>
+            <FieldLabel>Blend Mode</FieldLabel>
+            <SmallSelect
+              value={blendMode}
+              onChange={handleBlendMode}
+              options={['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+                'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion']}
+            />
+          </div>
+        </Section>
+
+        {/* ─ Section 8: Transform ─ */}
+        <Section title="Transform">
+          <Row2
+            a={{ label: 'Rotate', value: rotate, unit: '°', onChange: handleRotate }}
+            b={{ label: 'Scale X', value: scaleX, unit: '', onChange: handleScaleX }}
+          />
+          <Row2
+            a={{ label: 'Trans X', value: translateX, unit: 'px', onChange: handleTranslateX }}
+            b={{ label: 'Trans Y', value: translateY, unit: 'px', onChange: handleTranslateY }}
+          />
+        </Section>
+
+        {/* bottom padding */}
+        <div style={{ height: 12 }} />
+      </div>
+    </div>
+  );
+};
+
+export default EditorPanel;
