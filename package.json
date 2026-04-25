@@ -1,5 +1,5 @@
 {
-  "name": "optate",
+  "name": "@optate/plugin",
   "version": "0.1.1",
   "description": "Real-time design inspection and editing for your local dev server",
   "type": "module",
