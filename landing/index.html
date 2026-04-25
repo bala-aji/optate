@@ -615,19 +615,16 @@
             <div class="terminal-dot"></div>
             <div class="terminal-dot"></div>
             <div class="terminal-dot"></div>
-            <span class="terminal-title">vite.config.ts</span>
+            <span class="terminal-title">Terminal</span>
           </div>
           <div class="terminal-body">
-            <div class="t-line t-comment">// Install: npm install optate</div>
+            <div class="t-line t-comment"># Step 1 — install</div>
+            <div class="t-line"><span class="t-cmd">npm install optate</span></div>
             <div class="t-line">&nbsp;</div>
-            <div class="t-line"><span class="t-key">import</span> <span>{ optate } </span><span class="t-key">from</span> <span class="t-str">'optate/vite'</span></div>
-            <div class="t-line"><span class="t-key">import</span> <span>{ defineConfig } </span><span class="t-key">from</span> <span class="t-str">'vite'</span></div>
+            <div class="t-line t-comment"># Step 2 — run (replaces "vite" — no config edit needed)</div>
+            <div class="t-line"><span class="t-cmd">npx optate dev</span></div>
             <div class="t-line">&nbsp;</div>
-            <div class="t-line"><span class="t-key">export default</span> <span>defineConfig({</span></div>
-            <div class="t-line">&nbsp;&nbsp;<span class="t-key">plugins</span><span>: [optate()],</span></div>
-            <div class="t-line"><span>})</span></div>
-            <div class="t-line">&nbsp;</div>
-            <div class="t-line t-comment">// That's it. Open your dev server — Optate loads automatically.</div>
+            <div class="t-line t-comment"># Optate toolbar appears in the bottom right. That's it.</div>
           </div>
         </div>
       </div>
@@ -731,8 +728,8 @@
   <section class="install-section" id="install">
     <div class="container">
       <div class="section-label">Installation</div>
-      <h2 class="section-title">Up in 60 seconds</h2>
-      <p class="section-sub">Works with any Vite-based project — React, Vue, Svelte, Solid.</p>
+      <h2 class="section-title">Two commands. Done.</h2>
+      <p class="section-sub">No config file changes. Works with any Vite project — React, Vue, Svelte, Solid.</p>
 
       <div class="step-label">Step 1 — Install</div>
       <div class="code-block">
@@ -745,37 +742,27 @@
         </div>
       </div>
 
-      <div class="step-label">Step 2 — Add to Vite config</div>
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-filename">vite.config.ts</span>
-          <button class="copy-btn" onclick="copy(this, `import { optate } from 'optate/vite'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({\n  plugins: [optate()],\n})`)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="t-key">import</span> { optate } <span class="t-key">from</span> <span class="t-str">'optate/vite'</span><br />
-<span class="t-key">import</span> { defineConfig } <span class="t-key">from</span> <span class="t-str">'vite'</span><br />
-<br />
-<span class="t-key">export default</span> defineConfig({<br />
-&nbsp;&nbsp;<span class="t-key">plugins</span>: [<span class="t-val">optate()</span>],<br />
-})
-        </div>
-      </div>
-
-      <div class="step-label">Step 3 — Start your dev server</div>
+      <div class="step-label">Step 2 — Run your dev server</div>
       <div class="code-block">
         <div class="code-header">
           <span class="code-filename">Terminal</span>
-          <button class="copy-btn" onclick="copy(this, 'npm run dev')">Copy</button>
+          <button class="copy-btn" onclick="copy(this, 'npx optate dev')">Copy</button>
         </div>
         <div class="code-body">
-          <span class="t-cmd">npm run dev</span><br />
-          <span class="t-comment"># Optate loads automatically — look for the toolbar in the bottom right</span>
+          <span class="t-cmd">npx optate dev</span><br />
+          <span class="t-comment"># Optate toolbar appears bottom-right. Your vite.config.ts is untouched.</span>
         </div>
       </div>
 
-      <div style="margin-top:32px;padding:16px 20px;background:var(--green-dim);border:0.5px solid rgba(52,211,153,0.2);border-radius:var(--radius-sm);">
+      <div style="margin-top:20px;padding:16px 20px;background:var(--green-dim);border:0.5px solid rgba(52,211,153,0.2);border-radius:var(--radius-sm);">
         <p style="font-size:14px;color:var(--green);margin:0;">
-          <strong>Dev only.</strong> The Optate toolbar is injected only when <code style="font-size:12px">apply: 'serve'</code> — it never appears in your production build.
+          <strong>Tip:</strong> Add <code style="font-size:12px">"dev": "optate dev"</code> to your <code style="font-size:12px">package.json</code> scripts so it replaces <code style="font-size:12px">vite</code> permanently.
+        </p>
+      </div>
+
+      <div style="margin-top:12px;padding:16px 20px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-sm);">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0;">
+          <strong style="color:var(--text-tertiary);">Dev only.</strong> Optate never loads in production builds — the toolbar is completely absent when you deploy.
         </p>
       </div>
     </div>
