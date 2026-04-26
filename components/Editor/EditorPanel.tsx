@@ -1006,6 +1006,7 @@ export const EditorPanel: React.FC = () => {
   const [transformOrigin, setTransformOrigin] = useState('center center');
   const [flexDirection, setFlexDirection] = useState('row');
   const [flexWrap, setFlexWrap] = useState('nowrap');
+  const [display, setDisplay] = useState('block');
 
   // Spacing
   const [padding, setPadding] = useState<SpacingValues>({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
@@ -1115,6 +1116,7 @@ export const EditorPanel: React.FC = () => {
     setTransformOrigin('center center'); // computed returns px values; always reset to keyword default
     setFlexDirection(cs.flexDirection || 'row');
     setFlexWrap(cs.flexWrap || 'nowrap');
+    setDisplay(cs.display || 'block');
 
     // Spacing
     setPadding({
@@ -1232,6 +1234,7 @@ export const EditorPanel: React.FC = () => {
   const handlePosLeft = (v: string) => { setPosLeft(v); applyProp('left', v); };
   const handlePosTop = (v: string) => { setPosTop(v); applyProp('top', v); };
   const handleZIndex = (v: string) => { setZIndex(v); applyProp('z-index', v); };
+  const handleDisplay = (v: string) => { setDisplay(v); applyProp('display', v); };
   const handleAlignItems = (v: string) => {
     setAlignItems(v);
     // Ensure flex so align-items is visible
@@ -1657,6 +1660,33 @@ export const EditorPanel: React.FC = () => {
                 <option value="sticky">Sticky</option>
               </select>
               {/* Chevron */}
+              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+            </div>
+          </div>
+
+          {/* Display */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Display</span>
+            <div style={{ position: 'relative' }}>
+              <select
+                value={display}
+                onChange={e => handleDisplay(e.target.value)}
+                style={{
+                  width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                  color: T.valueColor, fontFamily: T.font, fontSize: 12,
+                  padding: '6px 28px 6px 10px', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                <option value="block">Block</option>
+                <option value="inline">Inline</option>
+                <option value="inline-block">Inline-block</option>
+                <option value="flex">Flex</option>
+                <option value="inline-flex">Inline-flex</option>
+                <option value="grid">Grid</option>
+                <option value="inline-grid">Inline-grid</option>
+                <option value="none">None</option>
+              </select>
               <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
             </div>
           </div>
