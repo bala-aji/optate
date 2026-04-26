@@ -535,6 +535,10 @@ const ChangesContent: React.FC = () => {
   const [changes, setChanges] = useState(changeTracker.getChanges());
   const [copied, setCopied] = useState(false);
   const [format, setFormat] = useState<'css' | 'json'>('css');
+  const [applying, setApplying] = useState(false);
+  const [applyResults, setApplyResults] = useState<Record<string, { status: string; file?: string; method?: string; error?: string }>>({});
+  const [cursorPrompt, setCursorPrompt] = useState('');
+  const [promptCopied, setPromptCopied] = useState(false);
 
   useEffect(() => {
     setChanges(changeTracker.getChanges());
@@ -545,6 +549,38 @@ const ChangesContent: React.FC = () => {
     const other = changes.filter(c => c.type !== 'style');
     if (format === 'json') return buildJSONExport(changes);
     return buildCSSExport() + (other.length ? '\n\n' + buildLogExport(other) : '');
+  };
+
+  const handleApply = async () => {
+    setApplying(true);
+    try {
+      const res = await fetch('/__optate/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      const resultMap: Record<string, any> = {};
+      (data.results ?? []).forEach((r: any) => { resultMap[r.id] = r; });
+      setApplyResults(resultMap);
+      setCursorPrompt(data.cursorPrompt ?? '');
+      // Auto-copy cursor prompt to clipboard
+      if (data.cursorPrompt) {
+        try { await navigator.clipboard.writeText(data.cursorPrompt); } catch {}
+      }
+    } catch (err) {
+      console.error('[Optate] Apply failed:', err);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    if (!cursorPrompt) return;
+    await navigator.clipboard.writeText(cursorPrompt);
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 2000);
   };
 
   const handleCopy = () => {
@@ -629,6 +665,16 @@ const ChangesContent: React.FC = () => {
             letterSpacing: '-0.01em', transition: 'background 0.2s ease', fontFamily: 'inherit',
           }}>
             {copied ? '✓' : 'Copy'}
+          </button>
+          <button onClick={handleApply} disabled={applying} style={{
+            padding: '4px 13px', fontSize: '12px', fontWeight: 590,
+            color: '#fff',
+            background: applying ? 'rgba(168,85,247,0.5)' : 'rgba(168,85,247,0.85)',
+            border: 'none', borderRadius: '8px', cursor: applying ? 'default' : 'pointer',
+            letterSpacing: '-0.01em', transition: 'background 0.2s ease', fontFamily: 'inherit',
+            opacity: applying ? 0.7 : 1,
+          }}>
+            {applying ? '…' : '⬆ Apply'}
           </button>
         </div>
       </div>
@@ -717,16 +763,52 @@ const ChangesContent: React.FC = () => {
                 </code>
               </div>
             )}
+            {applyResults[c.id] && (
+              <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                {applyResults[c.id].status === 'patched' ? (
+                  <>
+                    <span style={{ fontSize: 10, color: '#34d399' }}>✓</span>
+                    <code style={{ fontSize: 9.5, color: 'rgba(52,211,153,0.7)', fontFamily: `'SF Mono', ui-monospace, Menlo, monospace` }}>
+                      {applyResults[c.id].file}
+                    </code>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>
+                      {applyResults[c.id].method}
+                    </span>
+                  </>
+                ) : applyResults[c.id].status === 'failed' ? (
+                  <span style={{ fontSize: 10, color: '#f87171' }}>✗ {applyResults[c.id].error}</span>
+                ) : (
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>→ change-list.json</span>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {/* Footer hint */}
-      <div style={{ padding: '8px 16px 12px', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ fontSize: '11px', color: 'rgba(235,235,245,0.25)', lineHeight: 1.5, letterSpacing: '-0.01em' }}>
-          Add this to your chat or mention AI agent.
+      {cursorPrompt ? (
+        <div style={{ padding: '8px 10px 12px', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: '10px', color: 'rgba(52,211,153,0.8)', marginBottom: 4 }}>
+            ✓ Cursor prompt copied to clipboard
+          </div>
+          <button onClick={handleCopyPrompt} style={{
+            width: '100%', padding: '6px', fontSize: '11px', fontWeight: 500,
+            color: promptCopied ? '#34d399' : 'rgba(255,255,255,0.5)',
+            background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
+            borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit',
+            letterSpacing: '-0.01em',
+          }}>
+            {promptCopied ? '✓ Copied!' : '⌘ Copy Cursor Prompt'}
+          </button>
         </div>
-      </div>
+      ) : (
+        <div style={{ padding: '8px 16px 12px', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: '11px', color: 'rgba(235,235,245,0.25)', lineHeight: 1.5, letterSpacing: '-0.01em' }}>
+            Click ⬆ Apply to patch source files & copy Cursor prompt.
+          </div>
+        </div>
+      )}
     </div>
   );
 };

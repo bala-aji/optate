@@ -1,18 +1,37 @@
-import type { Plugin } from 'vite';
+import type { Plugin, ViteDevServer } from 'vite';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { applyChanges, generateCursorPrompt } from './apply-changes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = resolve(__dirname, '../dist');
 
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
+
 export function optate(): Plugin {
+  let projectRoot = process.cwd();
+
   return {
     name: 'optate',
     apply: 'serve',
 
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
+    configResolved(config) {
+      projectRoot = config.root;
+    },
+
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+
+        // ── Serve client bundle ───────────────────────────────────────────
         if (req.url === '/__optate/client.js') {
           const clientPath = resolve(distDir, 'client.js');
           if (!existsSync(clientPath)) {
@@ -24,6 +43,50 @@ export function optate(): Plugin {
           res.end(readFileSync(clientPath, 'utf-8'));
           return;
         }
+
+        // ── Apply changes to source files ─────────────────────────────────
+        if (req.url === '/__optate/apply' && req.method === 'POST') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          let payload: { changes: any[] };
+          try {
+            const body = await readBody(req);
+            payload = JSON.parse(body);
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+            return;
+          }
+
+          if (!Array.isArray(payload?.changes)) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Expected { changes: [...] }' }));
+            return;
+          }
+
+          try {
+            const { results, jsonPath } = applyChanges(payload.changes, projectRoot);
+            const cursorPrompt = generateCursorPrompt(payload.changes, results);
+            res.statusCode = 200;
+            res.end(JSON.stringify({ results, jsonPath, cursorPrompt }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+          }
+          return;
+        }
+
+        // ── CORS preflight ────────────────────────────────────────────────
+        if (req.url === '/__optate/apply' && req.method === 'OPTIONS') {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
         next();
       });
     },

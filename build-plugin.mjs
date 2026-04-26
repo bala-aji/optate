@@ -11,7 +11,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node18',
-  external: ['vite', 'node:fs', 'node:path', 'node:url', 'fs', 'path', 'url'],
+  external: ['vite', 'node:fs', 'node:path', 'node:url', 'node:http', 'fs', 'path', 'url'],
   minify: true,
   minifyIdentifiers: true,
   minifySyntax: true,
