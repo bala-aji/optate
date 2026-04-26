@@ -1020,7 +1020,13 @@ export const EditorPanel: React.FC = () => {
   const [bgColor, setBgColor] = useState('transparent');
   const [bgImage, setBgImage] = useState('none');
   const [bgSize, setBgSize] = useState('cover');
+  const [bgCustomSize, setBgCustomSize] = useState('');
   const [bgPosition, setBgPosition] = useState('center');
+  const [bgPosX, setBgPosX] = useState('50%');
+  const [bgPosY, setBgPosY] = useState('50%');
+  const [bgRepeat, setBgRepeat] = useState('no-repeat');
+  const [bgAttachment, setBgAttachment] = useState('scroll');
+  const [bgImageMode, setBgImageMode] = useState<'none' | 'gradient' | 'custom'>('none');
 
   // Border
   const [borderWidth, setBorderWidth] = useState('0');
@@ -1139,8 +1145,23 @@ export const EditorPanel: React.FC = () => {
     // Fill
     setBgColor(cs.backgroundColor || 'transparent');
     setBgImage(cs.backgroundImage || 'none');
-    setBgSize(cs.backgroundSize || 'cover');
+    const rawBgSize = cs.backgroundSize || 'cover';
+    if (rawBgSize === 'cover' || rawBgSize === 'contain') {
+      setBgSize(rawBgSize); setBgCustomSize('');
+    } else {
+      setBgSize('custom'); setBgCustomSize(rawBgSize);
+    }
     setBgPosition(cs.backgroundPosition || 'center');
+    const posParts = (cs.backgroundPosition || '50% 50%').split(' ');
+    setBgPosX(posParts[0] || '50%');
+    setBgPosY(posParts[1] || posParts[0] || '50%');
+    setBgRepeat(cs.backgroundRepeat || 'no-repeat');
+    setBgAttachment(cs.backgroundAttachment || 'scroll');
+    const rawImg = cs.backgroundImage || 'none';
+    setBgImage(rawImg);
+    if (rawImg === 'none') setBgImageMode('none');
+    else if (rawImg.startsWith('linear-gradient') || rawImg.startsWith('radial-gradient') || rawImg.startsWith('conic-gradient')) setBgImageMode('gradient');
+    else setBgImageMode('custom');
 
     // Border
     setBorderWidth((parseFloat(cs.borderTopWidth) || 0).toString());
@@ -1282,8 +1303,13 @@ export const EditorPanel: React.FC = () => {
 
   // Fill
   const handleBgColor = (v: string) => { setBgColor(v); applyProp('background-color', v); };
-  const handleBgSize = (v: string) => { setBgSize(v); applyProp('background-size', v); };
+  const handleBgSize = (v: string) => { setBgSize(v); if (v !== 'custom') applyProp('background-size', v); };
+  const handleBgCustomSize = (v: string) => { setBgCustomSize(v); applyProp('background-size', v); };
   const handleBgPosition = (v: string) => { setBgPosition(v); applyProp('background-position', v); };
+  const handleBgPosX = (v: string) => { setBgPosX(v); const pos = `${v} ${bgPosY}`; setBgPosition(pos); applyProp('background-position', pos); };
+  const handleBgPosY = (v: string) => { setBgPosY(v); const pos = `${bgPosX} ${v}`; setBgPosition(pos); applyProp('background-position', pos); };
+  const handleBgRepeat = (v: string) => { setBgRepeat(v); applyProp('background-repeat', v); };
+  const handleBgAttachment = (v: string) => { setBgAttachment(v); applyProp('background-attachment', v); };
 
   // Border
   const handleBorderWidth = (v: string) => { setBorderWidth(v.replace('px', '')); applyProp('border-width', `${v.replace('px', '')}px`); };
@@ -2027,9 +2053,202 @@ export const EditorPanel: React.FC = () => {
 
         {/* ─ Section 4: Fill & Background ─ */}
         <Section title="Fill & Background">
-          {/* Upload for <img> src */}
-          {tag === 'img' && (
+          {/* Background Color */}
+          <div style={{ marginBottom: 10 }}>
+            <FieldLabel>Background Color</FieldLabel>
+            <ColorSwatch value={bgColor} onChange={handleBgColor} />
+          </div>
+
+          {/* Background Image */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font }}>Background image</span>
+            </div>
+            {/* None / Gradient / Custom tabs */}
+            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 9, padding: 3, marginBottom: 8 }}>
+              {(['none', 'gradient', 'custom'] as const).map(mode => {
+                const active = bgImageMode === mode;
+                return (
+                  <button key={mode} onClick={() => {
+                    setBgImageMode(mode);
+                    if (mode === 'none') { setBgImage('none'); applyProp('background-image', 'none'); }
+                  }} style={{
+                    flex: 1, height: 26, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                    background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                    fontFamily: T.font, fontSize: 11, fontWeight: active ? 600 : 400,
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                    transition: 'all 0.12s', textTransform: 'capitalize',
+                  }}>{mode}</button>
+                );
+              })}
+            </div>
+            {/* URL display + upload icon */}
+            {bgImageMode !== 'none' && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px',
+                  overflow: 'hidden',
+                }}>
+                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                    <rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="5.5" cy="7" r="1.2"/><polyline points="1,12 5,8 8,11 11,8 15,12"/>
+                  </svg>
+                  <span style={{ fontSize: 11, color: T.valueColor, fontFamily: T.font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {bgImage !== 'none' ? bgImage : '—'}
+                  </span>
+                </div>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    title="Upload background image"
+                    onClick={() => (document.getElementById('optate-bg-upload') as HTMLInputElement)?.click()}
+                    style={{
+                      width: 30, height: 30, borderRadius: 7, border: T.inputBorder,
+                      background: T.inputBg, color: T.labelColor, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="8,11 8,3"/><polyline points="5,6 8,3 11,6"/>
+                      <path d="M3,12 Q3,14 8,14 Q13,14 13,12"/>
+                    </svg>
+                  </button>
+                  <input id="optate-bg-upload" type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f, 'bg-image'); e.target.value = ''; }} />
+                </div>
+              </div>
+            )}
+            {bgImageMode === 'none' && (
+              <UploadButton label="Upload Background Image" onFile={f => handleFileSelect(f, 'bg-image')} />
+            )}
+          </div>
+
+          {/* Background Position */}
+          {bgImageMode !== 'none' && (
             <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font }}>Background position</span>
+                {/* Fit icon */}
+                <button title="Reset to center" onClick={() => { handleBgPosX('50%'); handleBgPosY('50%'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: T.labelColor }}>
+                  <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="1" y="1" width="14" height="14" rx="2"/>
+                    <line x1="4" y1="8" x2="12" y2="8"/><line x1="8" y1="4" x2="8" y2="12"/>
+                  </svg>
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {/* X */}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
+                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                    <line x1="2" y1="8" x2="14" y2="8"/><polyline points="5,5 2,8 5,11"/><polyline points="11,5 14,8 11,11"/>
+                  </svg>
+                  <input defaultValue={bgPosX} key={`posx-${bgPosX}`}
+                    onBlur={e => handleBgPosX(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleBgPosX((e.target as HTMLInputElement).value); }}
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.valueColor, fontSize: 11, fontFamily: T.font, minWidth: 0 }} />
+                </div>
+                {/* Y */}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
+                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                    <line x1="8" y1="2" x2="8" y2="14"/><polyline points="5,5 8,2 11,5"/><polyline points="5,11 8,14 11,11"/>
+                  </svg>
+                  <input defaultValue={bgPosY} key={`posy-${bgPosY}`}
+                    onBlur={e => handleBgPosY(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleBgPosY((e.target as HTMLInputElement).value); }}
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.valueColor, fontSize: 11, fontFamily: T.font, minWidth: 0 }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Background Size */}
+          {bgImageMode !== 'none' && (
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background size</span>
+              <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 9, padding: 3, marginBottom: bgSize === 'custom' ? 6 : 0 }}>
+                {['Cover', 'Contain', 'Custom'].map(label => {
+                  const val = label.toLowerCase();
+                  const active = bgSize === val;
+                  return (
+                    <button key={val} onClick={() => handleBgSize(val)} style={{
+                      flex: 1, height: 26, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                      background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
+                      color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                      fontFamily: T.font, fontSize: 11, fontWeight: active ? 600 : 400,
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.3)' : 'none', transition: 'all 0.12s',
+                    }}>{label}</button>
+                  );
+                })}
+              </div>
+              {bgSize === 'custom' && (
+                <input defaultValue={bgCustomSize} key={`bgsz-${bgCustomSize}`}
+                  placeholder="e.g. 200px 100px"
+                  onBlur={e => handleBgCustomSize(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleBgCustomSize((e.target as HTMLInputElement).value); }}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                    color: T.valueColor, fontSize: 11, fontFamily: T.font, padding: '5px 8px', outline: 'none',
+                  }} />
+              )}
+            </div>
+          )}
+
+          {/* Background Repeat */}
+          {bgImageMode !== 'none' && (
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background repeat</span>
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
+                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                    <polyline points="3,11 1,13 3,15"/><polyline points="13,1 15,3 13,5"/>
+                    <path d="M15,3 H5 a2,2 0 0 0 -2,2 v4"/><path d="M1,13 H11 a2,2 0 0 0 2,-2 V7"/>
+                  </svg>
+                  <select value={bgRepeat} onChange={e => handleBgRepeat(e.target.value)} style={{
+                    flex: 1, appearance: 'none', WebkitAppearance: 'none',
+                    background: 'transparent', border: 'none', outline: 'none',
+                    color: T.valueColor, fontFamily: T.font, fontSize: 11, cursor: 'pointer',
+                  }}>
+                    <option value="no-repeat">No-repeat</option>
+                    <option value="repeat">Repeat</option>
+                    <option value="repeat-x">Repeat-x</option>
+                    <option value="repeat-y">Repeat-y</option>
+                    <option value="round">Round</option>
+                    <option value="space">Space</option>
+                  </select>
+                  <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}><polyline points="2,3 5,7 8,3"/></svg>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Background Attachment */}
+          {bgImageMode !== 'none' && (
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background attachment</span>
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
+                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                    <path d="M9.5 2.5 L13.5 6.5 L7 13 Q4 14 3 11 Q2 8 5 7 Z"/><line x1="2" y1="14" x2="5" y2="11"/>
+                  </svg>
+                  <select value={bgAttachment} onChange={e => handleBgAttachment(e.target.value)} style={{
+                    flex: 1, appearance: 'none', WebkitAppearance: 'none',
+                    background: 'transparent', border: 'none', outline: 'none',
+                    color: T.valueColor, fontFamily: T.font, fontSize: 11, cursor: 'pointer',
+                  }}>
+                    <option value="scroll">Scroll</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="local">Local</option>
+                  </select>
+                  <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}><polyline points="2,3 5,7 8,3"/></svg>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upload <img> src */}
+          {tag === 'img' && (
+            <div style={{ marginTop: 6 }}>
               <FieldLabel>Image Source</FieldLabel>
               <div style={{
                 fontSize: 10, color: T.labelColor, marginBottom: 4,
@@ -2041,38 +2260,6 @@ export const EditorPanel: React.FC = () => {
               <UploadButton label="Upload Image" onFile={f => handleFileSelect(f, 'img-src')} />
             </div>
           )}
-
-          <div style={{ marginBottom: 8 }}>
-            <FieldLabel>Background Color</FieldLabel>
-            <ColorSwatch value={bgColor} onChange={handleBgColor} />
-          </div>
-          {bgImage !== 'none' && (
-            <>
-              <div style={{ marginBottom: 8 }}>
-                <FieldLabel>Background Size</FieldLabel>
-                <Segmented
-                  value={bgSize}
-                  onChange={handleBgSize}
-                  options={[{ label: 'Cover', value: 'cover' }, { label: 'Contain', value: 'contain' }, { label: 'Auto', value: 'auto' }]}
-                />
-              </div>
-              <div>
-                <FieldLabel>Position</FieldLabel>
-                <input
-                  value={bgPosition}
-                  onChange={e => { setBgPosition(e.target.value); applyProp('background-position', e.target.value); }}
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: T.inputBg, border: T.inputBorder, borderRadius: 6,
-                    color: T.valueColor, fontSize: 12, fontFamily: T.font,
-                    padding: '5px 8px', outline: 'none',
-                  }}
-                />
-              </div>
-            </>
-          )}
-          {/* Upload background image for any element */}
-          <UploadButton label="Upload Background Image" onFile={f => handleFileSelect(f, 'bg-image')} />
         </Section>
 
         {/* ─ Section 5: Border ─ */}
