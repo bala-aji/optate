@@ -247,31 +247,34 @@ export function generateCursorPrompt(
 ): string {
   const patched = results.filter(r => r.status === 'patched').length;
   const needsManual = results.filter(r => r.status !== 'patched').length;
+  const url = typeof globalThis !== 'undefined' ? '' : '';
 
   const lines = [
-    `Apply these design changes from Optate to the source files.`,
+    `Applied ${changes.length} design change${changes.length !== 1 ? 's' : ''} via Optate.`,
     ``,
-    `Changes — ${changes.length} element${changes.length !== 1 ? 's' : ''} (${patched} auto-patched, ${needsManual} need manual apply):`,
-    ``,
+    `Elements modified:`,
   ];
 
   changes.forEach((c, i) => {
     const result = results.find(r => r.id === c.id);
-    const status = result?.status === 'patched'
-      ? `✓ auto-patched → ${result.file}`
-      : '← needs manual apply';
-    lines.push(`${i + 1}. ${c.readablePath || c.selector}`);
-    lines.push(`   ${c.property}: ${c.oldValue} → ${c.newValue}  (${status})`);
-    if (c.componentChain?.length) {
-      lines.push(`   Component: ${c.componentChain.join(' › ')}`);
+    const component = c.componentChain?.[0] ?? c.componentName ?? c.tagName;
+    const path = c.readablePath || c.selector;
+
+    if (result?.status === 'patched') {
+      lines.push(`${i + 1}. \`${path}\` — ${component} ✓ \`${result.file}\``);
+    } else {
+      lines.push(`${i + 1}. \`${path}\` — ${component} ← needs manual apply`);
     }
-    lines.push('');
   });
 
+  lines.push('');
+
+  if (patched > 0) {
+    lines.push(`Auto-patched files are already saved to disk.`);
+  }
+
   if (needsManual > 0) {
-    lines.push(`For items marked "needs manual apply":`);
-    lines.push(`- Find the source file for the component listed`);
-    lines.push(`- Apply the CSS property change directly in the file`);
+    lines.push(`For items marked ← needs manual apply: locate the component and apply the style change to match the live preview.`);
   }
 
   return lines.join('\n');
