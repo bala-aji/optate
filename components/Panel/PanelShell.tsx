@@ -571,6 +571,14 @@ const ChangesContent: React.FC = () => {
       if (data.cursorPrompt) {
         try { await navigator.clipboard.writeText(data.cursorPrompt); } catch {}
       }
+      // Auto-open each unique patched file in the editor
+      const seen = new Set<string>();
+      for (const r of (data.results ?? [])) {
+        if (r.editorUrl && !seen.has(r.editorUrl)) {
+          seen.add(r.editorUrl);
+          window.open(r.editorUrl, '_self');
+        }
+      }
       // Clear the change tracker — applied changes are now in source files
       changeTracker.clear();
       setApplyResults(resultMap);

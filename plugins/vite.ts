@@ -66,10 +66,10 @@ export function optate(): Plugin {
           }
 
           try {
-            const { results, jsonPath } = applyChanges(payload.changes, projectRoot);
+            const { results, jsonPath, editorScheme } = applyChanges(payload.changes, projectRoot);
             const cursorPrompt = generateCursorPrompt(payload.changes, results);
             res.statusCode = 200;
-            res.end(JSON.stringify({ results, jsonPath, cursorPrompt }));
+            res.end(JSON.stringify({ results, jsonPath, cursorPrompt, editorScheme }));
           } catch (err: any) {
             res.statusCode = 500;
             res.end(JSON.stringify({ error: String(err?.message ?? err) }));

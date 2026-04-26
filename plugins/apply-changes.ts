@@ -28,11 +28,37 @@ export interface ApplyResult {
   id: string;
   status: 'patched' | 'json-only' | 'failed';
   file?: string;
+  absolutePath?: string;
+  line?: number;
+  editorUrl?: string;
   method?: 'tsx-inline' | 'css' | 'css-override';
   error?: string;
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
+
+/** Detect which editor the project uses based on config folders */
+function detectEditorScheme(projectRoot: string): 'cursor' | 'vscode' {
+  if (existsSync(resolve(projectRoot, '.cursor'))) return 'cursor';
+  if (existsSync(resolve(projectRoot, '.vscode'))) return 'vscode';
+  return 'vscode'; // default
+}
+
+/** Find the 1-based line number where newValue first appears in a file */
+function findLineNumber(filePath: string, searchStr: string): number {
+  try {
+    const lines = readFileSync(filePath, 'utf-8').split('\n');
+    const idx = lines.findIndex(l => l.includes(searchStr));
+    return idx >= 0 ? idx + 1 : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/** Build the editor deep-link URL for a file + line */
+function buildEditorUrl(scheme: string, absolutePath: string, line: number): string {
+  return `${scheme}://file/${absolutePath}:${line}`;
+}
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -177,8 +203,9 @@ function writeOverrideCss(
 export function applyChanges(
   changes: ChangeRecord[],
   projectRoot: string
-): { results: ApplyResult[]; jsonPath: string } {
+): { results: ApplyResult[]; jsonPath: string; editorScheme: string } {
   const results: ApplyResult[] = [];
+  const editorScheme = detectEditorScheme(projectRoot);
 
   for (const change of changes) {
     if (change.type !== 'style') {
@@ -190,26 +217,40 @@ export function applyChanges(
       ? change.componentChain
       : change.componentName ? [change.componentName] : [];
 
+    const makeResult = (file: string, method: ApplyResult['method']): ApplyResult => {
+      const absPath = resolve(projectRoot, file);
+      const line = findLineNumber(absPath, change.newValue);
+      return {
+        id: change.id,
+        status: 'patched',
+        file,
+        absolutePath: absPath,
+        line,
+        editorUrl: buildEditorUrl(editorScheme, absPath, line),
+        method,
+      };
+    };
+
     // 1. Try TSX inline style
     if (chain.length > 0) {
       const tsx = patchTsx(projectRoot, chain, change.property, change.oldValue, change.newValue);
-      if (tsx.patched) {
-        results.push({ id: change.id, status: 'patched', file: tsx.file, method: 'tsx-inline' });
+      if (tsx.patched && tsx.file) {
+        results.push(makeResult(tsx.file, 'tsx-inline'));
         continue;
       }
     }
 
     // 2. Try CSS / SCSS
     const css = patchCss(projectRoot, change.property, change.oldValue, change.newValue);
-    if (css.patched) {
-      results.push({ id: change.id, status: 'patched', file: css.file, method: 'css' });
+    if (css.patched && css.file) {
+      results.push(makeResult(css.file, 'css'));
       continue;
     }
 
     // 3. Fall back: write optate-overrides.css
     try {
       const file = writeOverrideCss(projectRoot, change.selector, change.property, change.newValue);
-      results.push({ id: change.id, status: 'patched', file, method: 'css-override' });
+      results.push(makeResult(file, 'css-override'));
     } catch (err: any) {
       results.push({ id: change.id, status: 'failed', error: String(err?.message ?? err) });
     }
@@ -234,7 +275,7 @@ export function applyChanges(
   const jsonPath = resolve(projectRoot, 'change-list.json');
   writeFileSync(jsonPath, JSON.stringify(jsonPayload, null, 2) + '\n', 'utf-8');
 
-  return { results, jsonPath: 'change-list.json' };
+  return { results, jsonPath: 'change-list.json', editorScheme };
 }
 
 // ── Cursor prompt ─────────────────────────────────────────────────────────────
