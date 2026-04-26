@@ -37,14 +37,34 @@ export interface ApplyResult {
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-/** Detect which editor the project uses based on config folders */
-function detectEditorScheme(projectRoot: string): 'cursor' | 'vscode' {
-  if (existsSync(resolve(projectRoot, '.cursor'))) return 'cursor';
-  if (existsSync(resolve(projectRoot, '.vscode'))) return 'vscode';
-  return 'vscode'; // default
+export type EditorName = 'vscode' | 'cursor' | 'zed' | 'webstorm' | 'sublime' | 'textmate' | 'auto';
+
+/** URL builder per editor */
+const EDITOR_URL: Record<Exclude<EditorName, 'auto'>, (path: string, line: number) => string> = {
+  vscode:    (p, l) => `vscode://file/${p}:${l}`,
+  cursor:    (p, l) => `cursor://file/${p}:${l}`,
+  zed:       (p, l) => `zed://file/${p}:${l}`,
+  webstorm:  (p, l) => `webstorm://open?file=${encodeURIComponent(p)}&line=${l}`,
+  sublime:   (p, l) => `subl://open?url=file://${encodeURIComponent(p)}&line=${l}`,
+  textmate:  (p, l) => `txmt://open?url=file://${encodeURIComponent(p)}&line=${l}`,
+};
+
+/** Auto-detect editor from config folders present in the project root */
+function autoDetectEditor(projectRoot: string): Exclude<EditorName, 'auto'> {
+  if (existsSync(resolve(projectRoot, '.cursor')))  return 'cursor';
+  if (existsSync(resolve(projectRoot, '.zed')))     return 'zed';
+  if (existsSync(resolve(projectRoot, '.idea')))    return 'webstorm';
+  if (existsSync(resolve(projectRoot, '.vscode')))  return 'vscode';
+  return 'vscode'; // safe default
 }
 
-/** Find the 1-based line number where newValue first appears in a file */
+/** Resolve editor name (respects manual override, otherwise auto-detects) */
+function resolveEditor(projectRoot: string, override?: EditorName): Exclude<EditorName, 'auto'> {
+  if (override && override !== 'auto') return override;
+  return autoDetectEditor(projectRoot);
+}
+
+/** Find the 1-based line number where searchStr first appears in a file */
 function findLineNumber(filePath: string, searchStr: string): number {
   try {
     const lines = readFileSync(filePath, 'utf-8').split('\n');
@@ -56,8 +76,8 @@ function findLineNumber(filePath: string, searchStr: string): number {
 }
 
 /** Build the editor deep-link URL for a file + line */
-function buildEditorUrl(scheme: string, absolutePath: string, line: number): string {
-  return `${scheme}://file/${absolutePath}:${line}`;
+function buildEditorUrl(editor: Exclude<EditorName, 'auto'>, absolutePath: string, line: number): string {
+  return EDITOR_URL[editor]?.(absolutePath, line) ?? EDITOR_URL.vscode(absolutePath, line);
 }
 
 function escapeRegex(s: string) {
@@ -202,10 +222,11 @@ function writeOverrideCss(
 
 export function applyChanges(
   changes: ChangeRecord[],
-  projectRoot: string
+  projectRoot: string,
+  editorOverride?: EditorName
 ): { results: ApplyResult[]; jsonPath: string; editorScheme: string } {
   const results: ApplyResult[] = [];
-  const editorScheme = detectEditorScheme(projectRoot);
+  const editorScheme = resolveEditor(projectRoot, editorOverride);
 
   for (const change of changes) {
     if (change.type !== 'style') {

@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { applyChanges, generateCursorPrompt } from './apply-changes.js';
+import { applyChanges, generateCursorPrompt, type EditorName } from './apply-changes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = resolve(__dirname, '../dist');
@@ -17,7 +17,12 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-export function optate(): Plugin {
+export interface OptateOptions {
+  /** Force a specific editor for file deep-links. Default: auto-detect from .cursor/.vscode/.zed/.idea */
+  editor?: EditorName;
+}
+
+export function optate(options: OptateOptions = {}): Plugin {
   let projectRoot = process.cwd();
 
   return {
@@ -66,7 +71,7 @@ export function optate(): Plugin {
           }
 
           try {
-            const { results, jsonPath, editorScheme } = applyChanges(payload.changes, projectRoot);
+            const { results, jsonPath, editorScheme } = applyChanges(payload.changes, projectRoot, options.editor);
             const cursorPrompt = generateCursorPrompt(payload.changes, results);
             res.statusCode = 200;
             res.end(JSON.stringify({ results, jsonPath, cursorPrompt, editorScheme }));
