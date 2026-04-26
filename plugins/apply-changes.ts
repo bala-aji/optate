@@ -2,7 +2,7 @@
 // Node.js only — runs in the Vite server process
 
 import {
-  readFileSync, writeFileSync, existsSync, readdirSync,
+  readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync,
 } from 'node:fs';
 import { resolve, join, extname, relative } from 'node:path';
 
@@ -233,6 +233,9 @@ export function applyChanges(
   const jsonPath = resolve(projectRoot, 'change-list.json');
   writeFileSync(jsonPath, JSON.stringify(jsonPayload, null, 2) + '\n', 'utf-8');
 
+  // Auto-delete after apply — changes are captured in the cursor prompt
+  try { unlinkSync(jsonPath); } catch {}
+
   return { results, jsonPath: 'change-list.json' };
 }
 
@@ -247,7 +250,6 @@ export function generateCursorPrompt(
 
   const lines = [
     `Apply these design changes from Optate to the source files.`,
-    `Full context is in \`change-list.json\` at the project root.`,
     ``,
     `Changes — ${changes.length} element${changes.length !== 1 ? 's' : ''} (${patched} auto-patched, ${needsManual} need manual apply):`,
     ``,
@@ -268,9 +270,8 @@ export function generateCursorPrompt(
 
   if (needsManual > 0) {
     lines.push(`For items marked "needs manual apply":`);
-    lines.push(`- Open change-list.json and find the matching source file`);
-    lines.push(`- Apply the property change`);
-    lines.push(`- Delete change-list.json when done`);
+    lines.push(`- Find the source file for the component listed`);
+    lines.push(`- Apply the CSS property change directly in the file`);
   }
 
   return lines.join('\n');

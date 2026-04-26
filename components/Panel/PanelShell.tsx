@@ -563,12 +563,14 @@ const ChangesContent: React.FC = () => {
       const data = await res.json();
       const resultMap: Record<string, any> = {};
       (data.results ?? []).forEach((r: any) => { resultMap[r.id] = r; });
-      setApplyResults(resultMap);
       setCursorPrompt(data.cursorPrompt ?? '');
       // Auto-copy cursor prompt to clipboard
       if (data.cursorPrompt) {
         try { await navigator.clipboard.writeText(data.cursorPrompt); } catch {}
       }
+      // Clear the change tracker — applied changes are now in source files
+      changeTracker.clear();
+      setApplyResults(resultMap);
     } catch (err) {
       console.error('[Optate] Apply failed:', err);
     } finally {
