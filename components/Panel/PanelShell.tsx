@@ -753,16 +753,16 @@ const ChangesContent: React.FC = () => {
               </div>
             )}
 
-            {/* Selector — tiny, collapsed */}
-            {c.selector && (
+            {/* Short path — Page > Component > element */}
+            {(c.shortPath || c.readablePath || c.selector) && (
               <div style={{ marginTop: '6px' }}>
-                <code style={{
-                  fontSize: '9.5px', color: 'rgba(235,235,245,0.18)',
+                <span style={{
+                  fontSize: '10px', color: 'rgba(235,235,245,0.28)',
                   fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`,
-                  wordBreak: 'break-all', lineHeight: 1.4,
+                  letterSpacing: '-0.01em',
                 }}>
-                  {truncate(c.selector, 60)}
-                </code>
+                  {c.shortPath || truncate(c.readablePath || c.selector, 55)}
+                </span>
               </div>
             )}
             {applyResults[c.id] && (

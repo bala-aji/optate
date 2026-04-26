@@ -12,6 +12,7 @@ export interface ChangeRecord {
   id: string;
   selector: string;
   readablePath: string;
+  shortPath: string;
   tagName: string;
   elementName: string;
   componentName: string | null;
@@ -219,7 +220,7 @@ export function applyChanges(
     generated: new Date().toISOString(),
     count: changes.length,
     changes: changes.map(c => ({
-      path: c.readablePath || c.selector,
+      path: c.shortPath || c.readablePath || c.selector,
       component: c.componentChain?.[0] ?? c.componentName ?? c.tagName,
       componentChain: c.componentChain,
       selector: c.selector,
@@ -244,7 +245,13 @@ export function generateCursorPrompt(
 ): string {
   const count = changes.length;
 
+  const paths = changes
+    .map((c, i) => `${i + 1}. ${c.shortPath || c.readablePath || c.selector}`)
+    .join('\n');
+
   return [
     `Check \`change-list.json\` at the project root and complete those ${count} design change${count !== 1 ? 's' : ''} in the source files.`,
+    ``,
+    paths,
   ].join('\n');
 }

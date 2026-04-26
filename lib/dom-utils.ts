@@ -61,6 +61,57 @@ export function getUniqueSelector(el: HTMLElement): string {
 }
 
 /**
+ * Derives a page name from the current URL pathname.
+ * / → Home, /login → Login, /dashboard/settings → Settings
+ */
+export function getPageName(): string {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return 'Home';
+  const last = segments[segments.length - 1];
+  return last
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\s+/g, '');
+}
+
+// Tailwind utility prefix patterns — classes matching these are skipped
+const TW_PREFIXES = /^(flex|grid|block|inline|hidden|text-|bg-|p-|m-|w-|h-|border|rounded|shadow|font-|items-|justify-|gap-|space-|overflow|z-|fixed|absolute|relative|sticky|top-|bottom-|left-|right-|col-|row-|min-|max-|aspect-|sr-|not-|group|peer|cursor-|select-|pointer-|transition|duration-|ease-|animate-|scale-|rotate-|translate-|skew-|origin-|opacity-|mix-|blur-|brightness-|contrast-|grayscale|hue-|invert|saturate|sepia|drop-|backdrop-|fill-|stroke-)/;
+
+/**
+ * Returns the most meaningful short label for an element:
+ * #id > aria-label > first non-utility class > tag
+ */
+export function getElementLabel(el: HTMLElement): string {
+  if (el.id) return `#${el.id}`;
+
+  const aria = el.getAttribute('aria-label') || el.getAttribute('title');
+  if (aria && aria.length < 32) return aria;
+
+  const meaningfulClass = Array.from(el.classList).find(
+    c => c.length < 32 && !TW_PREFIXES.test(c) && !/^[A-Z0-9]{6,}$/.test(c)
+  );
+  if (meaningfulClass) return `.${meaningfulClass}`;
+
+  return el.tagName.toLowerCase();
+}
+
+/**
+ * Returns a short human path: Page > Component > element-label
+ * Uses React fiber component chain for the component name.
+ */
+export function getShortPath(el: HTMLElement, componentChain: string[]): string {
+  const page = getPageName();
+  const component = componentChain[0] ?? null;
+  const element = getElementLabel(el);
+
+  const parts: string[] = [page];
+  if (component && component !== page) parts.push(component);
+  parts.push(element);
+
+  return parts.join(' > ');
+}
+
+/**
  * Gets the bounding rect adjusted for scroll.
  */
 export function getAbsoluteBoundingRect(el: HTMLElement) {

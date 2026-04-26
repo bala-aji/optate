@@ -1,4 +1,4 @@
-import { getUniqueSelector, getReadablePath } from './dom-utils';
+import { getUniqueSelector, getReadablePath, getShortPath } from './dom-utils';
 import { overrideSheet } from './override-sheet';
 import { getReactComponentName, getReactComponentChain } from './react-fiber';
 
@@ -7,6 +7,7 @@ export interface ElementChange {
   timestamp: number;
   selector: string;
   readablePath: string;              // e.g. section.hero>div.container>h1>span.accent
+  shortPath: string;                 // e.g. Login > LoginForm > #email
   tagName: string;
   elementName: string;
   elementDescription: string;
@@ -123,6 +124,7 @@ class ChangeTracker {
         timestamp: Date.now(),
         selector,
         readablePath: getReadablePath(element),
+        shortPath: getShortPath(element, chain),
         tagName: element.tagName.toLowerCase(),
         elementName,
         elementDescription,

@@ -107,7 +107,7 @@ function generateReport(changes: ElementChange[]): string {
 
   entries.forEach(([, elementChanges], index) => {
     const first = elementChanges[0];
-    const path = first.readablePath || first.selector;
+    const path = first.shortPath || first.readablePath || first.selector;
 
     report += `${index + 1}. ${path}\n`;
 
