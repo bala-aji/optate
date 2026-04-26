@@ -613,6 +613,139 @@ const EASING_CATEGORIES: Record<string, string[]> = {
   'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
 };
 
+// ─── DOM Tree Popover ─────────────────────────────────────────────────────────
+
+function getNodeLabel(el: Element): string {
+  const tag = el.tagName.toLowerCase();
+  if ((el as HTMLElement).id) return `${tag}#${(el as HTMLElement).id}`;
+  const first = el.classList[0];
+  return first ? `${tag}.${first}` : tag;
+}
+
+const DomTreeNode: React.FC<{
+  label: string;
+  selected?: boolean;
+  muted?: boolean;
+  accent?: boolean;
+  indent?: number;
+  showLine?: boolean;
+}> = ({ label, selected, muted, accent, indent = 0, showLine }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, paddingLeft: indent * 14 }}>
+    {showLine && (
+      <div style={{
+        width: 10, height: 16, borderLeft: '1.5px solid rgba(255,255,255,0.12)',
+        borderBottom: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '0 0 0 4px',
+        flexShrink: 0, marginTop: -8,
+      }} />
+    )}
+    <div style={{
+      padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 500,
+      fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`,
+      border: selected
+        ? '1.5px solid rgba(52,211,153,0.7)'
+        : '1px solid rgba(255,255,255,0.08)',
+      background: selected
+        ? 'rgba(52,211,153,0.08)'
+        : 'rgba(255,255,255,0.05)',
+      color: selected
+        ? 'rgba(52,211,153,0.95)'
+        : accent
+          ? 'rgba(251,191,36,0.85)'
+          : muted
+            ? 'rgba(255,255,255,0.35)'
+            : 'rgba(255,255,255,0.7)',
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </div>
+  </div>
+);
+
+const CollapsedNode: React.FC<{ count: number; indent?: number }> = ({ count, indent = 0 }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, paddingLeft: indent * 14 }}>
+    <div style={{
+      width: 10, height: 16,
+      borderLeft: '1.5px solid rgba(255,255,255,0.12)',
+      borderBottom: '1.5px solid rgba(255,255,255,0.12)',
+      borderRadius: '0 0 0 4px', flexShrink: 0, marginTop: -8,
+    }} />
+    <div style={{
+      padding: '3px 8px', borderRadius: 6, fontSize: 10,
+      background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)',
+      border: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      ···
+    </div>
+    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>({count} more)</span>
+  </div>
+);
+
+const DomTreePopover: React.FC<{ el: HTMLElement; onClose: () => void }> = ({ el, onClose }) => {
+  // Collect ancestors (body → ... → immediate parent)
+  const ancestors: Element[] = [];
+  let cur: Element | null = el.parentElement;
+  while (cur && cur.tagName !== 'HTML') {
+    ancestors.unshift(cur);
+    cur = cur.parentElement;
+  }
+
+  const bodyEl = ancestors[0];
+  const immediateParent = ancestors[ancestors.length - 1];
+  const hiddenAncestors = ancestors.length > 2 ? ancestors.length - 2 : 0;
+
+  const children = Array.from(el.children);
+  const firstChild = children[0] as HTMLElement | undefined;
+  const moreChildren = children.length - 1;
+
+  return (
+    <div
+      style={{
+        position: 'absolute', top: 50, left: 8, right: 8,
+        background: 'rgba(18,18,20,0.97)',
+        border: '0.5px solid rgba(255,255,255,0.1)',
+        borderRadius: 12, padding: '12px 12px 10px',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+        zIndex: 10, backdropFilter: 'blur(20px)',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Close */}
+      <button onClick={onClose} style={{
+        position: 'absolute', top: 8, right: 8,
+        background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+        cursor: 'pointer', fontSize: 12, padding: '2px 6px',
+      }}>✕</button>
+
+      {/* body */}
+      {bodyEl && <DomTreeNode label={getNodeLabel(bodyEl)} muted />}
+
+      {/* collapsed middle ancestors */}
+      {hiddenAncestors > 0 && <CollapsedNode count={hiddenAncestors} indent={1} />}
+
+      {/* immediate parent (if different from body) */}
+      {immediateParent && immediateParent !== bodyEl && (
+        <DomTreeNode label={getNodeLabel(immediateParent)} indent={hiddenAncestors > 0 ? 1 : 1} showLine />
+      )}
+
+      {/* selected element */}
+      <DomTreeNode
+        label={getNodeLabel(el)}
+        selected
+        indent={ancestors.length > 1 ? 2 : 1}
+        showLine
+      />
+
+      {/* first child */}
+      {firstChild && (
+        <DomTreeNode label={getNodeLabel(firstChild)} accent indent={3} showLine />
+      )}
+
+      {/* more children */}
+      {moreChildren > 0 && <CollapsedNode count={moreChildren} indent={3} />}
+    </div>
+  );
+};
+
 // ─── Animate sub-components ───────────────────────────────────────────────────
 
 const AnimSlider: React.FC<{ label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }> = ({ label, value, min, max, step = 1, unit = '', onChange }) => (
@@ -761,6 +894,7 @@ export const EditorPanel: React.FC = () => {
   const { selectedElement: el, isEditing, setIsEditing, viewportMode } = useSelection();
   const [panelSide, setPanelSide] = useState<'left' | 'right'>('right');
   const [mounted, setMounted] = useState(false);
+  const [showDomTree, setShowDomTree] = useState(false);
 
   // Slide-in on mount
   useEffect(() => {
@@ -1279,35 +1413,40 @@ export const EditorPanel: React.FC = () => {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={panelStyle}>
+    <div style={panelStyle} onClick={() => showDomTree && setShowDomTree(false)}>
+      {/* ── DOM Tree Popover ── */}
+      {showDomTree && <DomTreePopover el={el} onClose={() => setShowDomTree(false)} />}
+
       {/* ── Header ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 12px', borderBottom: T.border, flexShrink: 0,
         background: 'rgba(255,255,255,0.02)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.accent, flexShrink: 0, boxShadow: `0 0 6px ${T.accent}` }} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, overflow: 'hidden' }}>
-              <span style={{ fontSize: 12, color: T.valueColor, fontWeight: 600, fontFamily: T.font, whiteSpace: 'nowrap' }}>
-                {'<'}{tag}{'>'}
-              </span>
-              {elIdentifier && (
-                <span style={{
-                  fontSize: 11, color: 'rgba(168,85,247,0.85)', fontWeight: 500,
-                  fontFamily: T.font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {elIdentifier}
-                </span>
-              )}
-            </div>
-            {componentName && (
-              <span style={{ fontSize: 10, color: T.labelColor, display: 'block', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {componentName}
-              </span>
-            )}
+        <div
+          onClick={e => { e.stopPropagation(); setShowDomTree(v => !v); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden', cursor: 'pointer' }}
+        >
+          {/* Tree icon */}
+          <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke={showDomTree ? T.accent : 'rgba(255,255,255,0.35)'} strokeWidth="1.6" strokeLinecap="round">
+            <path d="M2 3h4M2 8h4M2 13h4M6 3v10M10 6h4M10 11h4M14 6v5" />
+          </svg>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px',
+            borderRadius: 7,
+            border: showDomTree ? '1px solid rgba(52,211,153,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: showDomTree ? 'rgba(52,211,153,0.07)' : 'transparent',
+            transition: 'all 0.15s',
+          }}>
+            <span style={{ fontSize: 12, color: T.valueColor, fontWeight: 600, fontFamily: T.font, whiteSpace: 'nowrap' }}>
+              {tag}{elIdentifier}
+            </span>
           </div>
+          {componentName && (
+            <span style={{ fontSize: 10, color: T.labelColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {componentName}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
           <IconBtn onClick={handleDelete} title="Delete element" danger>
