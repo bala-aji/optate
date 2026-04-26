@@ -2,7 +2,7 @@
 // Node.js only — runs in the Vite server process
 
 import {
-  readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync,
+  readFileSync, writeFileSync, existsSync, readdirSync,
 } from 'node:fs';
 import { resolve, join, extname, relative } from 'node:path';
 
@@ -233,9 +233,6 @@ export function applyChanges(
   const jsonPath = resolve(projectRoot, 'change-list.json');
   writeFileSync(jsonPath, JSON.stringify(jsonPayload, null, 2) + '\n', 'utf-8');
 
-  // Auto-delete after apply — changes are captured in the cursor prompt
-  try { unlinkSync(jsonPath); } catch {}
-
   return { results, jsonPath: 'change-list.json' };
 }
 
@@ -245,37 +242,9 @@ export function generateCursorPrompt(
   changes: ChangeRecord[],
   results: ApplyResult[]
 ): string {
-  const patched = results.filter(r => r.status === 'patched').length;
-  const needsManual = results.filter(r => r.status !== 'patched').length;
-  const url = typeof globalThis !== 'undefined' ? '' : '';
+  const count = changes.length;
 
-  const lines = [
-    `Applied ${changes.length} design change${changes.length !== 1 ? 's' : ''} via Optate.`,
-    ``,
-    `Elements modified:`,
-  ];
-
-  changes.forEach((c, i) => {
-    const result = results.find(r => r.id === c.id);
-    const component = c.componentChain?.[0] ?? c.componentName ?? c.tagName;
-    const path = c.readablePath || c.selector;
-
-    if (result?.status === 'patched') {
-      lines.push(`${i + 1}. \`${path}\` — ${component} ✓ \`${result.file}\``);
-    } else {
-      lines.push(`${i + 1}. \`${path}\` — ${component} ← needs manual apply`);
-    }
-  });
-
-  lines.push('');
-
-  if (patched > 0) {
-    lines.push(`Auto-patched files are already saved to disk.`);
-  }
-
-  if (needsManual > 0) {
-    lines.push(`For items marked ← needs manual apply: locate the component and apply the style change to match the live preview.`);
-  }
-
-  return lines.join('\n');
+  return [
+    `Check \`change-list.json\` at the project root and complete those ${count} design change${count !== 1 ? 's' : ''} in the source files.`,
+  ].join('\n');
 }
