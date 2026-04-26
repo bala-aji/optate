@@ -83,6 +83,36 @@ export function isOptateElement(el: Element): boolean {
 }
 
 /**
+ * Builds a human-readable DOM path like section.hero>div.container>h1>span.accent
+ * Walks from the element up to <body>, building tag+id/class segments.
+ */
+export function getReadablePath(el: HTMLElement): string {
+  const parts: string[] = [];
+  let current: HTMLElement | null = el;
+
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    const tag = current.tagName.toLowerCase();
+    if (tag === 'html' || tag === 'body') break;
+
+    let segment = tag;
+    if (current.id) {
+      segment = `${tag}#${current.id}`;
+    } else if (current.classList.length > 0) {
+      // Use up to 2 meaningful classes (skip very long/generated ones)
+      const classes = Array.from(current.classList)
+        .filter(c => c.length < 40 && !c.match(/^[A-Z0-9]{6,}$/))
+        .slice(0, 2);
+      if (classes.length > 0) segment = `${tag}.${classes.join('.')}`;
+    }
+
+    parts.unshift(segment);
+    current = current.parentElement;
+  }
+
+  return parts.join('>');
+}
+
+/**
  * Gets a friendly display name for an element in the layers tree.
  */
 export function getDisplayName(el: HTMLElement): string {

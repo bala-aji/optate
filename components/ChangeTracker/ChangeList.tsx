@@ -95,43 +95,32 @@ export const ChangeList: React.FC = () => {
 };
 
 function generateReport(changes: ElementChange[]): string {
-  const url = window.location.href;
-  
-  let report = `Page: ${url}\n`;
-  report += `Apply these CSS changes:\n\n`;
-
-  // Group by selector to treat multiple changes on same element together if needed, 
-  // but the user's example shows each modification as a separate numbered item if they refer to different semantic parts 
-  // or maybe they just want each property change numbered.
-  // In the example: 
-  // 1.Div: card-header (...)
-  // font-size: 20px → 24px
-  
-  // Actually, let's group by element (selector) so multiple style changes on the SAME element stay together under one number.
+  // Group by selector so multiple properties on the same element stay under one number
   const grouped = changes.reduce((acc, change) => {
     if (!acc[change.selector]) acc[change.selector] = [];
     acc[change.selector].push(change);
     return acc;
   }, {} as Record<string, ElementChange[]>);
 
-  Object.entries(grouped).forEach(([selector, elementChanges], index) => {
-    const firstChange = elementChanges[0];
-    const tagName = firstChange.tagName.charAt(0).toUpperCase() + firstChange.tagName.slice(1);
-    const name = firstChange.elementName;
-    const description = firstChange.elementDescription;
+  const entries = Object.entries(grouped);
+  let report = `Optate Changes — ${entries.length} element${entries.length !== 1 ? 's' : ''} modified\n\n`;
 
-    report += `${index + 1}.${tagName}: ${name} (${description})\n\n`;
+  entries.forEach(([, elementChanges], index) => {
+    const first = elementChanges[0];
+    const path = first.readablePath || first.selector;
+
+    report += `${index + 1}. ${path}\n`;
 
     elementChanges.forEach(c => {
       if (c.type === 'style') {
-        report += `${c.property}: ${c.oldValue} → ${c.newValue}\n`;
+        report += `   ${c.property}: ${c.oldValue} → ${c.newValue}\n`;
       } else {
-        report += `${c.type}: ${c.oldValue} → ${c.newValue}\n`;
+        report += `   ${c.type}: ${c.oldValue} → ${c.newValue}\n`;
       }
     });
-    
+
     report += `\n`;
   });
 
-  return report.trim() + `\n`;
+  return report.trim();
 }

@@ -1252,6 +1252,9 @@ export const EditorPanel: React.FC = () => {
   const tag = el.tagName.toLowerCase();
   const componentName = getFiberComponentName(el);
   const isTextTag = TEXT_TAGS.includes(tag);
+  const elId = el.id ? `#${el.id}` : '';
+  const elClass = el.classList.length > 0 ? `.${el.classList[0]}` : '';
+  const elIdentifier = elId || elClass || '';
 
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
@@ -1286,9 +1289,19 @@ export const EditorPanel: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.accent, flexShrink: 0, boxShadow: `0 0 6px ${T.accent}` }} />
           <div style={{ minWidth: 0 }}>
-            <span style={{ fontSize: 12, color: T.valueColor, fontWeight: 600, fontFamily: T.font }}>
-              {'<'}{tag}{'>'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, overflow: 'hidden' }}>
+              <span style={{ fontSize: 12, color: T.valueColor, fontWeight: 600, fontFamily: T.font, whiteSpace: 'nowrap' }}>
+                {'<'}{tag}{'>'}
+              </span>
+              {elIdentifier && (
+                <span style={{
+                  fontSize: 11, color: 'rgba(168,85,247,0.85)', fontWeight: 500,
+                  fontFamily: T.font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {elIdentifier}
+                </span>
+              )}
+            </div>
             {componentName && (
               <span style={{ fontSize: 10, color: T.labelColor, display: 'block', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {componentName}

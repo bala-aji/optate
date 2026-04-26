@@ -1,4 +1,4 @@
-import { getUniqueSelector } from './dom-utils';
+import { getUniqueSelector, getReadablePath } from './dom-utils';
 import { overrideSheet } from './override-sheet';
 import { getReactComponentName, getReactComponentChain } from './react-fiber';
 
@@ -6,6 +6,7 @@ export interface ElementChange {
   id: string;
   timestamp: number;
   selector: string;
+  readablePath: string;              // e.g. section.hero>div.container>h1>span.accent
   tagName: string;
   elementName: string;
   elementDescription: string;
@@ -121,6 +122,7 @@ class ChangeTracker {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: Date.now(),
         selector,
+        readablePath: getReadablePath(element),
         tagName: element.tagName.toLowerCase(),
         elementName,
         elementDescription,

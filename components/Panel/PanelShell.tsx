@@ -917,9 +917,8 @@ function buildCSSExport(): string {
 function buildLogExport(changes: any[]): string {
   if (!changes.length) return '/* No content changes */';
   return changes.map(c => {
-    const chain: string[] = c.componentChain?.length ? c.componentChain : (c.componentName ? [c.componentName] : []);
-    const loc = chain.length ? `${chain.join(' › ')} — ` : '';
-    const header = `/* ${c.type.toUpperCase()} — ${loc}<${c.tagName}> "${c.elementDescription}" */`;
+    const path = c.readablePath || c.selector;
+    const header = `/* ${c.type.toUpperCase()} — ${path} */`;
     if (c.type === 'html') {
       const summary = htmlChangeSummary(c);
       return `${header}\n/* Changes: ${summary} */`;
