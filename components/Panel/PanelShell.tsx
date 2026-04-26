@@ -204,6 +204,9 @@ export const PanelShell: React.FC<PanelShellProps> = ({
     setIsVisible(false);
     setSelectedElement(null);
     setShowChanges(false);
+    // Reset viewport back to desktop when panel closes
+    setViewportMode('desktop');
+    changeTracker.setViewportMode('desktop');
     setTimeout(() => setIsCollapsed(true), 300);
   };
 
