@@ -1,5 +1,5 @@
 import type { Plugin, ViteDevServer } from 'vite';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -75,6 +75,37 @@ export function optate(options: OptateOptions = {}): Plugin {
             const cursorPrompt = generateCursorPrompt(payload.changes, results);
             res.statusCode = 200;
             res.end(JSON.stringify({ results, jsonPath, cursorPrompt, editorScheme }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+          }
+          return;
+        }
+
+        // ── Upload image to public/uploads/ ───────────────────────────────
+        if (req.url === '/__optate/upload' && req.method === 'POST') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          let payload: { filename: string; data: string; mimeType: string };
+          try {
+            const body = await readBody(req);
+            payload = JSON.parse(body);
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+            return;
+          }
+          try {
+            // Sanitise filename
+            const safeName = payload.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uploadDir = resolve(projectRoot, 'public', 'uploads');
+            mkdirSync(uploadDir, { recursive: true });
+            const filePath = resolve(uploadDir, safeName);
+            const buffer = Buffer.from(payload.data, 'base64');
+            writeFileSync(filePath, buffer);
+            const url = `/uploads/${safeName}`;
+            res.statusCode = 200;
+            res.end(JSON.stringify({ url }));
           } catch (err: any) {
             res.statusCode = 500;
             res.end(JSON.stringify({ error: String(err?.message ?? err) }));

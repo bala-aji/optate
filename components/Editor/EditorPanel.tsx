@@ -613,6 +613,84 @@ const EASING_CATEGORIES: Record<string, string[]> = {
   'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
 };
 
+// ─── Image Upload ─────────────────────────────────────────────────────────────
+
+const UploadModal: React.FC<{
+  preview: string;
+  filename: string;
+  onBase64: () => void;
+  onPublic: () => void;
+  onCancel: () => void;
+  uploading: boolean;
+}> = ({ preview, filename, onBase64, onPublic, onCancel, uploading }) => (
+  <div style={{
+    position: 'fixed', inset: 0, zIndex: 2147483647,
+    background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }} onClick={onCancel}>
+    <div style={{
+      background: 'rgba(22,22,24,0.98)', border: '0.5px solid rgba(255,255,255,0.12)',
+      borderRadius: 16, padding: 20, width: 240, boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+    }} onClick={e => e.stopPropagation()}>
+      {/* Preview */}
+      <img src={preview} alt="preview" style={{
+        width: '100%', height: 120, objectFit: 'contain', borderRadius: 8,
+        background: 'rgba(255,255,255,0.04)', marginBottom: 12, display: 'block',
+      }} />
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {filename}
+      </div>
+      {/* Options */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button onClick={onBase64} style={{
+          padding: '9px 14px', borderRadius: 9, border: '0.5px solid rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)',
+          fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        }}>
+          ⚡ Use as Base64 <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>— instant, no server</span>
+        </button>
+        <button onClick={onPublic} disabled={uploading} style={{
+          padding: '9px 14px', borderRadius: 9, border: '0.5px solid rgba(168,85,247,0.3)',
+          background: uploading ? 'rgba(168,85,247,0.1)' : 'rgba(168,85,247,0.15)',
+          color: uploading ? 'rgba(168,85,247,0.5)' : '#c084fc',
+          fontSize: 12, fontWeight: 500, cursor: uploading ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        }}>
+          {uploading ? '⏳ Uploading…' : '📁 Save to public/uploads/'} {!uploading && <span style={{ color: 'rgba(168,85,247,0.5)', fontSize: 10 }}>— clean URL</span>}
+        </button>
+        <button onClick={onCancel} style={{
+          padding: '6px', borderRadius: 8, border: 'none',
+          background: 'transparent', color: 'rgba(255,255,255,0.3)',
+          fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+        }}>Cancel</button>
+      </div>
+    </div>
+  </div>
+);
+
+const UploadButton: React.FC<{ label: string; onFile: (file: File) => void }> = ({ label, onFile }) => {
+  const ref = React.useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) { onFile(f); e.target.value = ''; } }} />
+      <button onClick={() => ref.current?.click()} style={{
+        width: '100%', padding: '7px 10px', borderRadius: 8, marginTop: 8,
+        border: '0.5px dashed rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)',
+        color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 500,
+        cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M8 11V3M4 6l4-4 4 4M2 13h12" />
+        </svg>
+        {label}
+      </button>
+    </>
+  );
+};
+
 // ─── DOM Tree Popover ─────────────────────────────────────────────────────────
 
 function getNodeLabel(el: Element): string {
@@ -895,6 +973,8 @@ export const EditorPanel: React.FC = () => {
   const [panelSide, setPanelSide] = useState<'left' | 'right'>('right');
   const [mounted, setMounted] = useState(false);
   const [showDomTree, setShowDomTree] = useState(false);
+  const [uploadPending, setUploadPending] = useState<{ file: File; base64: string; target: 'img-src' | 'bg-image' } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Slide-in on mount
   useEffect(() => {
@@ -1363,6 +1443,58 @@ export const EditorPanel: React.FC = () => {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  // ── Image upload ──────────────────────────────────────────────────────────
+
+  const handleFileSelect = (file: File, target: 'img-src' | 'bg-image') => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadPending({ file, base64: reader.result as string, target });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const applyImage = (url: string, target: 'img-src' | 'bg-image') => {
+    if (!el) return;
+    if (target === 'img-src') {
+      const old = (el as HTMLImageElement).src;
+      (el as HTMLImageElement).src = url;
+      changeTracker.recordChange(el, 'image', 'src', old, url);
+    } else {
+      const val = `url("${url}")`;
+      applyProp('background-image', val);
+    }
+    setUploadPending(null);
+  };
+
+  const handleUseBase64 = () => {
+    if (!uploadPending) return;
+    applyImage(uploadPending.base64, uploadPending.target);
+  };
+
+  const handleSaveToPublic = async () => {
+    if (!uploadPending) return;
+    setUploading(true);
+    try {
+      const rawBase64 = uploadPending.base64.split(',')[1];
+      const res = await fetch('/__optate/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: uploadPending.file.name,
+          data: rawBase64,
+          mimeType: uploadPending.file.type,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) applyImage(data.url, uploadPending.target);
+      else alert('Upload failed: ' + (data.error ?? 'unknown error'));
+    } catch (err) {
+      alert('Upload failed — is the Optate dev server running?');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleClose = () => {
     setMounted(false);
     setTimeout(() => setIsEditing(false), 220);
@@ -1414,6 +1546,18 @@ export const EditorPanel: React.FC = () => {
 
   return (
     <div style={panelStyle} onClick={() => showDomTree && setShowDomTree(false)}>
+      {/* ── Upload Modal ── */}
+      {uploadPending && (
+        <UploadModal
+          preview={uploadPending.base64}
+          filename={uploadPending.file.name}
+          onBase64={handleUseBase64}
+          onPublic={handleSaveToPublic}
+          onCancel={() => setUploadPending(null)}
+          uploading={uploading}
+        />
+      )}
+
       {/* ── DOM Tree Popover ── */}
       {showDomTree && <DomTreePopover el={el} onClose={() => setShowDomTree(false)} />}
 
@@ -1753,6 +1897,21 @@ export const EditorPanel: React.FC = () => {
 
         {/* ─ Section 4: Fill & Background ─ */}
         <Section title="Fill & Background">
+          {/* Upload for <img> src */}
+          {tag === 'img' && (
+            <div style={{ marginBottom: 10 }}>
+              <FieldLabel>Image Source</FieldLabel>
+              <div style={{
+                fontSize: 10, color: T.labelColor, marginBottom: 4,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontFamily: `'SF Mono', ui-monospace, Menlo, monospace`,
+              }}>
+                {(el as HTMLImageElement).src ? new URL((el as HTMLImageElement).src).pathname : '—'}
+              </div>
+              <UploadButton label="Upload Image" onFile={f => handleFileSelect(f, 'img-src')} />
+            </div>
+          )}
+
           <div style={{ marginBottom: 8 }}>
             <FieldLabel>Background Color</FieldLabel>
             <ColorSwatch value={bgColor} onChange={handleBgColor} />
@@ -1782,6 +1941,8 @@ export const EditorPanel: React.FC = () => {
               </div>
             </>
           )}
+          {/* Upload background image for any element */}
+          <UploadButton label="Upload Background Image" onFile={f => handleFileSelect(f, 'bg-image')} />
         </Section>
 
         {/* ─ Section 5: Border ─ */}
