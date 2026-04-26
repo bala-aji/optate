@@ -346,6 +346,23 @@ export const PanelShell: React.FC<PanelShellProps> = ({
             </svg>
           </ToolbarButton>
 
+          {/* Optate logo */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="og1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#a855f7" />
+                  <stop offset="50%" stopColor="#ec4899" />
+                  <stop offset="100%" stopColor="#22d3ee" />
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="48" stroke="url(#og1)" strokeWidth="10" fill="none" />
+              <circle cx="50" cy="50" r="14" fill="url(#og1)" />
+              {/* cursor arrow */}
+              <path d="M54 54 L72 68 L66 70 L70 80 L64 83 L60 73 L54 78 Z" fill="url(#og1)" opacity="0.9" />
+            </svg>
+          </div>
+
           <ToolbarDivider />
 
           {/* Viewport segmented control */}
