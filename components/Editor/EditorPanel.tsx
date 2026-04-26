@@ -1007,6 +1007,10 @@ export const EditorPanel: React.FC = () => {
   const [flexDirection, setFlexDirection] = useState('row');
   const [flexWrap, setFlexWrap] = useState('nowrap');
   const [display, setDisplay] = useState('block');
+  const [visibility, setVisibility] = useState('visible');
+  const [overflow, setOverflow] = useState('visible');
+  const [cssFloat, setCssFloat] = useState('none');
+  const [cssClear, setCssClear] = useState('none');
 
   // Spacing
   const [padding, setPadding] = useState<SpacingValues>({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
@@ -1117,6 +1121,10 @@ export const EditorPanel: React.FC = () => {
     setFlexDirection(cs.flexDirection || 'row');
     setFlexWrap(cs.flexWrap || 'nowrap');
     setDisplay(cs.display || 'block');
+    setVisibility(cs.visibility || 'visible');
+    setOverflow(cs.overflow || 'visible');
+    setCssFloat(cs.float || 'none');
+    setCssClear(cs.clear || 'none');
 
     // Spacing
     setPadding({
@@ -1235,6 +1243,10 @@ export const EditorPanel: React.FC = () => {
   const handlePosTop = (v: string) => { setPosTop(v); applyProp('top', v); };
   const handleZIndex = (v: string) => { setZIndex(v); applyProp('z-index', v); };
   const handleDisplay = (v: string) => { setDisplay(v); applyProp('display', v); };
+  const handleVisibility = (v: string) => { setVisibility(v); applyProp('visibility', v); };
+  const handleOverflow = (v: string) => { setOverflow(v); applyProp('overflow', v); };
+  const handleFloat = (v: string) => { setCssFloat(v); applyProp('float', v); };
+  const handleClear = (v: string) => { setCssClear(v); applyProp('clear', v); };
   const handleAlignItems = (v: string) => {
     setAlignItems(v);
     // Ensure flex so align-items is visible
@@ -1756,12 +1768,6 @@ export const EditorPanel: React.FC = () => {
             </div>
           )}
 
-          {/* Z-Index when positioned */}
-          {position !== 'static' && (
-            <div style={{ marginBottom: 8 }}>
-              <ScrubInput label="Z-Index" value={zIndex} unit="" onChange={handleZIndex} step={1} />
-            </div>
-          )}
 
           {/* Alignment — 6 buttons (3 justify + 3 align) */}
           <div style={{ marginBottom: 8 }}>
@@ -1913,6 +1919,100 @@ export const EditorPanel: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* Visibility */}
+          <div style={{ marginTop: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Visibility</span>
+            <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 9, padding: 3 }}>
+              {[
+                { v: 'visible', label: 'Visible', icon: <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="2"/></svg> },
+                { v: 'hidden',  label: 'Hidden',  icon: <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="2" x2="14" y2="14"/><path d="M6.5 3.5A7 4 0 0 1 14 8"/><path d="M2 6a7 4 0 0 0 8.5 5.5"/></svg> },
+              ].map(({ v, label, icon }) => {
+                const active = visibility === v;
+                return (
+                  <button key={v} onClick={() => handleVisibility(v)} style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    height: 28, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                    background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                    fontFamily: T.font, fontSize: 11, fontWeight: active ? 600 : 400,
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                    transition: 'all 0.12s',
+                  }}>
+                    {icon}{label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Overflow */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Overflow</span>
+            <div style={{ position: 'relative' }}>
+              <select value={overflow} onChange={e => handleOverflow(e.target.value)} style={{
+                width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                color: T.valueColor, fontFamily: T.font, fontSize: 12,
+                padding: '6px 28px 6px 10px', cursor: 'pointer', outline: 'none',
+              }}>
+                <option value="visible">Visible</option>
+                <option value="hidden">Hidden</option>
+                <option value="scroll">Scroll</option>
+                <option value="auto">Auto</option>
+                <option value="clip">Clip</option>
+              </select>
+              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+            </div>
+          </div>
+
+          {/* Z-Index — always visible */}
+          <div style={{ marginBottom: 8 }}>
+            <ScrubInput label="Z-Index" value={zIndex} unit="" onChange={handleZIndex} step={1} />
+          </div>
+
+          {/* Float + Clear — side by side */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {/* Float */}
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Float</span>
+              <div style={{ position: 'relative' }}>
+                <select value={cssFloat} onChange={e => handleFloat(e.target.value)} style={{
+                  width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                  color: T.valueColor, fontFamily: T.font, fontSize: 12,
+                  padding: '6px 24px 6px 8px', cursor: 'pointer', outline: 'none',
+                }}>
+                  <option value="none">None</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="inline-start">Inline-start</option>
+                  <option value="inline-end">Inline-end</option>
+                </select>
+                <svg style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              </div>
+            </div>
+            {/* Clear */}
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Clear</span>
+              <div style={{ position: 'relative' }}>
+                <select value={cssClear} onChange={e => handleClear(e.target.value)} style={{
+                  width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                  color: T.valueColor, fontFamily: T.font, fontSize: 12,
+                  padding: '6px 24px 6px 8px', cursor: 'pointer', outline: 'none',
+                }}>
+                  <option value="none">None</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="both">Both</option>
+                  <option value="inline-start">Inline-start</option>
+                  <option value="inline-end">Inline-end</option>
+                </select>
+                <svg style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              </div>
+            </div>
+          </div>
+
         </Section>
 
         {/* ─ Section 3: Spacing ─ */}
