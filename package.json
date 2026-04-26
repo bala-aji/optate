@@ -35,6 +35,8 @@
     "README.md"
   ],
   "scripts": {
+    "dev": "vite --config vite.dev.config.ts",
+    "dev:watch": "BUILD_MODE=development vite build --watch",
     "build:client": "vite build",
     "build:plugin": "node build-plugin.mjs",
     "build": "npm run build:client && npm run build:plugin",

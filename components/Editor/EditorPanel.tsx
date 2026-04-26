@@ -386,115 +386,184 @@ function getFiberComponentName(el: HTMLElement): string | null {
 
 interface SpacingValues { top: string; right: string; bottom: string; left: string }
 
+// Horizontal padding icon — vertical bars flanking a box  |□|
+const HPadIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="3" width="8" height="10" rx="1.5"/>
+    <line x1="1.5" y1="3" x2="1.5" y2="13"/>
+    <line x1="14.5" y1="3" x2="14.5" y2="13"/>
+  </svg>
+);
+
+// Vertical padding icon — horizontal bars above/below a box
+const VPadIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="10" height="8" rx="1.5"/>
+    <line x1="3" y1="1.5" x2="13" y2="1.5"/>
+    <line x1="3" y1="14.5" x2="13" y2="14.5"/>
+  </svg>
+);
+
+// Individual sides toggle icon — dashed corner marks
+const IndividualSidesIcon = () => (
+  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 5V3a1 1 0 0 1 1-1h2"/>
+    <path d="M11 2h2a1 1 0 0 1 1 1v2"/>
+    <path d="M14 11v2a1 1 0 0 1-1 1h-2"/>
+    <path d="M5 14H3a1 1 0 0 1-1-1v-2"/>
+    <line x1="6.5" y1="2" x2="9.5" y2="2" strokeDasharray="1.5 1.5"/>
+    <line x1="14" y1="6.5" x2="14" y2="9.5" strokeDasharray="1.5 1.5"/>
+    <line x1="6.5" y1="14" x2="9.5" y2="14" strokeDasharray="1.5 1.5"/>
+    <line x1="2" y1="6.5" x2="2" y2="9.5" strokeDasharray="1.5 1.5"/>
+  </svg>
+);
+
+// px → number
+const px2n = (v: string) => parseFloat(v) || 0;
+const n2px = (n: number) => `${n}px`;
+// Returns display value if L===R, else '–'
+const axisVal = (a: string, b: string) => a === b ? a.replace('px', '') : '–';
+
+// An inline icon+input pill
+const AxisInput: React.FC<{
+  icon: React.ReactNode;
+  value: string;           // display value (number string or '–')
+  onCommit: (v: string) => void;
+}> = ({ icon, value, onCommit }) => {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { if (!focused) setDraft(value); }, [value, focused]);
+
+  const commit = () => {
+    setFocused(false);
+    const n = parseFloat(draft);
+    if (!isNaN(n)) onCommit(n2px(n));
+    else setDraft(value); // revert if invalid
+  };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      flex: 1, minWidth: 0,
+      background: focused ? T.inputBgFocus : T.inputBg,
+      border: focused ? T.inputBorderFocus : T.inputBorder,
+      borderRadius: 7, padding: '4px 8px',
+      color: T.labelColor,
+    }}>
+      {icon}
+      <input
+        value={draft}
+        onFocus={() => setFocused(true)}
+        onBlur={commit}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+        style={{
+          flex: 1, minWidth: 0, background: 'transparent', border: 'none',
+          outline: 'none', color: T.valueColor, fontSize: 11,
+          fontFamily: T.font, padding: 0,
+        }}
+      />
+    </div>
+  );
+};
+
+// Individual side input with label below
+const SideInput: React.FC<{
+  label: string;
+  value: string;
+  onCommit: (v: string) => void;
+}> = ({ label, value, onCommit }) => {
+  const [f, setF] = useState(false);
+  const [d, setD] = useState(value.replace('px', ''));
+  useEffect(() => { if (!f) setD(value.replace('px', '')); }, [value, f]);
+  const commit = () => { setF(false); onCommit(n2px(px2n(d))); };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <input
+        value={d}
+        onFocus={() => setF(true)}
+        onBlur={commit}
+        onChange={e => setD(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+        style={{
+          width: '100%', textAlign: 'center',
+          background: f ? T.inputBgFocus : T.inputBg,
+          border: f ? T.inputBorderFocus : T.inputBorder,
+          borderRadius: 6, color: T.valueColor, fontSize: 11,
+          fontFamily: T.font, outline: 'none', padding: '4px 2px',
+        }}
+      />
+      <span style={{ fontSize: 9, color: T.labelColor, fontFamily: T.font, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}
+      </span>
+    </div>
+  );
+};
+
+// One spacing property row: [H-icon val] [V-icon val] [individual toggle]
+// Expands to T R B L grid when individual mode is active
+const SpacingRow: React.FC<{
+  label: string;
+  values: SpacingValues;
+  onChange: (side: keyof SpacingValues, v: string) => void;
+}> = ({ label, values, onChange }) => {
+  const [individual, setIndividual] = useState(false);
+
+  const hVal = axisVal(values.left, values.right);   // horizontal: L = R
+  const vVal = axisVal(values.top, values.bottom);   // vertical: T = B
+
+  const setH = (v: string) => { onChange('left', v); onChange('right', v); };
+  const setV = (v: string) => { onChange('top', v); onChange('bottom', v); };
+
+  return (
+    <div style={{ fontFamily: T.font }}>
+      {/* Label row */}
+      <span style={{ fontSize: 10, color: T.labelColor, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>
+        {label}
+      </span>
+      {/* Compact H/V row */}
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <AxisInput icon={<HPadIcon />} value={hVal} onCommit={setH} />
+        <AxisInput icon={<VPadIcon />} value={vVal} onCommit={setV} />
+        {/* Individual toggle */}
+        <button
+          title="Individual sides"
+          onClick={() => setIndividual(i => !i)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 28, height: 28, flexShrink: 0, borderRadius: 7, border: 'none',
+            cursor: 'pointer',
+            background: individual ? 'rgba(255,255,255,0.12)' : T.inputBg,
+            color: individual ? T.valueColor : T.labelColor,
+          }}
+        >
+          <IndividualSidesIcon />
+        </button>
+      </div>
+      {/* Individual T R B L */}
+      {individual && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 6 }}>
+          <SideInput label="T" value={values.top}    onCommit={v => onChange('top', v)} />
+          <SideInput label="R" value={values.right}  onCommit={v => onChange('right', v)} />
+          <SideInput label="B" value={values.bottom} onCommit={v => onChange('bottom', v)} />
+          <SideInput label="L" value={values.left}   onCommit={v => onChange('left', v)} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BoxModelWidget: React.FC<{
   padding: SpacingValues;
   margin: SpacingValues;
   onPaddingChange: (side: keyof SpacingValues, v: string) => void;
   onMarginChange: (side: keyof SpacingValues, v: string) => void;
-}> = ({ padding, margin, onPaddingChange, onMarginChange }) => {
-  const [paddingLinked, setPaddingLinked] = useState(false);
-  const [marginLinked, setMarginLinked] = useState(false);
-
-  const sideStyle = (active?: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)',
-    fontSize: 10, color: T.valueColor, fontFamily: T.font,
-    cursor: 'default', padding: '2px 4px', borderRadius: 3, minWidth: 28,
-  });
-
-  const SideVal: React.FC<{ val: string; onChange: (v: string) => void }> = ({ val, onChange }) => {
-    const [focused, setFocused] = useState(false);
-    const [draft, setDraft] = useState(val.replace('px', ''));
-    useEffect(() => { if (!focused) setDraft(val.replace('px', '')); }, [val, focused]);
-    return (
-      <input
-        value={draft}
-        onFocus={() => { setFocused(true); }}
-        onBlur={() => { setFocused(false); onChange(`${parseFloat(draft) || 0}px`); }}
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') onChange(`${parseFloat(draft) || 0}px`); }}
-        style={{
-          width: 36, textAlign: 'center', background: focused ? T.inputBgFocus : T.inputBg,
-          border: focused ? T.inputBorderFocus : T.inputBorder, borderRadius: 4,
-          color: T.valueColor, fontSize: 10, fontFamily: T.font, outline: 'none', padding: '2px 2px',
-        }}
-      />
-    );
-  };
-
-  const numVal = (v: string) => parseFloat(v) || 0;
-
-  const handlePadding = (side: keyof SpacingValues, v: string) => {
-    if (paddingLinked) {
-      (['top', 'right', 'bottom', 'left'] as (keyof SpacingValues)[]).forEach(s => onPaddingChange(s, v));
-    } else {
-      onPaddingChange(side, v);
-    }
-  };
-
-  const handleMargin = (side: keyof SpacingValues, v: string) => {
-    if (marginLinked) {
-      (['top', 'right', 'bottom', 'left'] as (keyof SpacingValues)[]).forEach(s => onMarginChange(s, v));
-    } else {
-      onMarginChange(side, v);
-    }
-  };
-
-  return (
-    <div style={{ fontFamily: T.font }}>
-      {/* Visual box */}
-      <div style={{
-        position: 'relative', border: '1.5px dashed rgba(249,115,22,0.4)', borderRadius: 6,
-        padding: 8, marginBottom: 10,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-          <SideVal val={margin.top} onChange={v => handleMargin('top', v)} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <SideVal val={margin.left} onChange={v => handleMargin('left', v)} />
-          {/* Inner padding box */}
-          <div style={{
-            flex: 1, border: '1.5px dashed rgba(52,211,153,0.4)', borderRadius: 4, padding: 6,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-              <SideVal val={padding.top} onChange={v => handlePadding('top', v)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <SideVal val={padding.left} onChange={v => handlePadding('left', v)} />
-              <div style={{ fontSize: 9, color: T.labelColor, textAlign: 'center', lineHeight: 1 }}>content</div>
-              <SideVal val={padding.right} onChange={v => handlePadding('right', v)} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
-              <SideVal val={padding.bottom} onChange={v => handlePadding('bottom', v)} />
-            </div>
-          </div>
-          <SideVal val={margin.right} onChange={v => handleMargin('right', v)} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
-          <SideVal val={margin.bottom} onChange={v => handleMargin('bottom', v)} />
-        </div>
-        {/* Labels */}
-        <div style={{ position: 'absolute', top: 2, left: 4, fontSize: 9, color: 'rgba(249,115,22,0.6)' }}>margin</div>
-        <div style={{ position: 'absolute', top: 32, left: 20, fontSize: 9, color: 'rgba(52,211,153,0.6)' }}>padding</div>
-      </div>
-      {/* Link toggles */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-        <button onClick={() => setPaddingLinked(!paddingLinked)} style={{
-          display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
-          cursor: 'pointer', fontSize: 10, color: paddingLinked ? T.accent : T.labelColor, fontFamily: T.font,
-        }}>
-          <LinkIcon linked={paddingLinked} /> Link padding
-        </button>
-        <button onClick={() => setMarginLinked(!marginLinked)} style={{
-          display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
-          cursor: 'pointer', fontSize: 10, color: marginLinked ? T.accentOrange : T.labelColor, fontFamily: T.font,
-        }}>
-          <LinkIcon linked={marginLinked} /> Link margin
-        </button>
-      </div>
-    </div>
-  );
-};
+}> = ({ padding, margin, onPaddingChange, onMarginChange }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <SpacingRow label="Padding" values={padding} onChange={onPaddingChange} />
+    <SpacingRow label="Margin"  values={margin}  onChange={onMarginChange} />
+  </div>
+);
 
 // ─── Animate types & constants ────────────────────────────────────────────────
 
@@ -716,6 +785,13 @@ export const EditorPanel: React.FC = () => {
   const [posLeft, setPosLeft] = useState('');
   const [posTop, setPosTop] = useState('');
   const [zIndex, setZIndex] = useState('');
+  // Alignment (flex/grid parent controls)
+  const [alignItems, setAlignItems] = useState('flex-start');
+  const [justifyContent, setJustifyContent] = useState('flex-start');
+  const [gap, setGap] = useState('0');
+  const [transformOrigin, setTransformOrigin] = useState('center center');
+  const [flexDirection, setFlexDirection] = useState('row');
+  const [flexWrap, setFlexWrap] = useState('nowrap');
 
   // Spacing
   const [padding, setPadding] = useState<SpacingValues>({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
@@ -818,6 +894,13 @@ export const EditorPanel: React.FC = () => {
     setPosLeft(cs.left || '0px');
     setPosTop(cs.top || '0px');
     setZIndex(cs.zIndex === 'auto' ? '' : cs.zIndex || '');
+    const normAlign = (v: string) => (v === 'normal' || !v) ? 'flex-start' : v;
+    setAlignItems(normAlign(cs.alignItems));
+    setJustifyContent(normAlign(cs.justifyContent));
+    setGap((parseFloat(cs.gap) || 0).toString());
+    setTransformOrigin('center center'); // computed returns px values; always reset to keyword default
+    setFlexDirection(cs.flexDirection || 'row');
+    setFlexWrap(cs.flexWrap || 'nowrap');
 
     // Spacing
     setPadding({
@@ -935,6 +1018,28 @@ export const EditorPanel: React.FC = () => {
   const handlePosLeft = (v: string) => { setPosLeft(v); applyProp('left', v); };
   const handlePosTop = (v: string) => { setPosTop(v); applyProp('top', v); };
   const handleZIndex = (v: string) => { setZIndex(v); applyProp('z-index', v); };
+  const handleAlignItems = (v: string) => {
+    setAlignItems(v);
+    // Ensure flex so align-items is visible
+    const cs = el ? window.getComputedStyle(el) : null;
+    if (cs && cs.display !== 'flex' && cs.display !== 'grid') applyProp('display', 'flex');
+    applyProp('align-items', v);
+  };
+  const handleJustifyContent = (v: string) => {
+    setJustifyContent(v);
+    const cs = el ? window.getComputedStyle(el) : null;
+    if (cs && cs.display !== 'flex' && cs.display !== 'grid') applyProp('display', 'flex');
+    applyProp('justify-content', v);
+  };
+  const handleFlexDirection = (dir: string, wrap: string) => {
+    setFlexDirection(dir); setFlexWrap(wrap);
+    const cs = el ? window.getComputedStyle(el) : null;
+    if (cs && cs.display !== 'flex' && cs.display !== 'grid') applyProp('display', 'flex');
+    applyProp('flex-direction', dir);
+    applyProp('flex-wrap', wrap);
+  };
+  const handleGap = (v: string) => { setGap(v); applyProp('gap', `${v}px`); };
+  const handleTransformOrigin = (v: string) => { setTransformOrigin(v); applyProp('transform-origin', v); };
 
   // Spacing
   const handlePaddingChange = (side: keyof SpacingValues, v: string) => {
@@ -1236,30 +1341,252 @@ export const EditorPanel: React.FC = () => {
 
         {/* ─ Section 2: Position ─ */}
         <Section title="Position">
+          {/* Position type — dropdown */}
           <div style={{ marginBottom: 8 }}>
-            <Segmented
-              value={position}
-              onChange={handlePosition}
-              options={[
-                { label: 'Static', value: 'static' },
-                { label: 'Rel', value: 'relative' },
-                { label: 'Abs', value: 'absolute' },
-                { label: 'Fixed', value: 'fixed' },
-                { label: 'Sticky', value: 'sticky' },
-              ]}
-            />
+            <div style={{ position: 'relative' }}>
+              <select
+                value={position}
+                onChange={e => handlePosition(e.target.value)}
+                style={{
+                  width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                  color: T.valueColor, fontSize: 11, fontFamily: T.font,
+                  padding: '6px 28px 6px 10px', outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="static">Static</option>
+                <option value="relative">Relative</option>
+                <option value="absolute">Absolute</option>
+                <option value="fixed">Fixed</option>
+                <option value="sticky">Sticky</option>
+              </select>
+              {/* Chevron */}
+              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+            </div>
           </div>
+
+          {/* Flow — between dropdown and alignment */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Flow direction</span>
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 9, padding: 3 }}>
+            {([
+              { dir: 'row',    title: 'Horizontal',
+                icon: <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="1" y1="8" x2="15" y2="8"/>
+                  <polyline points="4,5 1,8 4,11"/>
+                  <polyline points="12,5 15,8 12,11"/>
+                </svg> },
+              { dir: 'column', title: 'Vertical',
+                icon: <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="1" x2="8" y2="15"/>
+                  <polyline points="5,4 8,1 11,4"/>
+                  <polyline points="5,12 8,15 11,12"/>
+                </svg> },
+            ] as Array<{ dir: string; title: string; icon: React.ReactNode }>).map(({ dir, title, icon }) => {
+              const active = flexDirection === dir;
+              return (
+                <button key={dir} title={title} onClick={() => handleFlexDirection(dir, flexWrap)} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  height: 26, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                  background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                  transition: 'all 0.12s',
+                }}>{icon}</button>
+              );
+            })}
+          </div>
+          </div>
+
+          {/* X / Y when positioned */}
           {position !== 'static' && (
-            <>
-              <Row2
-                a={{ label: 'X (left)', value: posLeft.replace('px', ''), unit: 'px', onChange: handlePosLeft }}
-                b={{ label: 'Y (top)', value: posTop.replace('px', ''), unit: 'px', onChange: handlePosTop }}
-              />
-              <div style={{ marginTop: 4 }}>
-                <ScrubInput label="Z-Index" value={zIndex} unit="" onChange={handleZIndex} step={1} />
-              </div>
-            </>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {/* X input */}
+              {[
+                { label: 'X', val: posLeft, onChange: handlePosLeft },
+                { label: 'Y', val: posTop,  onChange: handlePosTop },
+              ].map(({ label, val, onChange }) => {
+                const num = val.replace('px', '');
+                return (
+                  <div key={label} style={{
+                    flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                    background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                    padding: '5px 8px',
+                  }}>
+                    <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, flexShrink: 0 }}>{label}</span>
+                    <input
+                      defaultValue={num}
+                      key={num}
+                      onBlur={e => onChange(`${parseFloat(e.target.value) || 0}px`)}
+                      onKeyDown={e => { if (e.key === 'Enter') onChange(`${parseFloat((e.target as HTMLInputElement).value) || 0}px`); }}
+                      style={{
+                        flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                        color: T.valueColor, fontSize: 11, fontFamily: T.font, minWidth: 0,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
+
+          {/* Z-Index when positioned */}
+          {position !== 'static' && (
+            <div style={{ marginBottom: 8 }}>
+              <ScrubInput label="Z-Index" value={zIndex} unit="" onChange={handleZIndex} step={1} />
+            </div>
+          )}
+
+          {/* Alignment — 6 buttons (3 justify + 3 align) */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Alignment</span>
+            <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.04)', borderRadius: 9, padding: 3 }}>
+              {/* justify-content buttons */}
+              {([
+                { t: 'Justify start',  jc: 'flex-start' },
+                { t: 'Justify center', jc: 'center'     },
+                { t: 'Justify end',    jc: 'flex-end'   },
+              ]).map(({ t, jc }) => {
+                const active = justifyContent === jc;
+                return (
+                  <button key={jc} title={t} onClick={() => handleJustifyContent(jc)} style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: 26, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                    background: active ? 'rgba(99,102,241,0.85)' : 'transparent',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.45)',
+                    boxShadow: active ? '0 1px 4px rgba(99,102,241,0.5)' : 'none',
+                    transition: 'all 0.12s',
+                  }}>
+                    {jc === 'flex-start' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="2" y1="2" x2="2" y2="14"/><rect x="4" y="4" width="5" height="3" rx="1"/><rect x="4" y="9" width="8" height="3" rx="1"/>
+                      </svg>
+                    )}
+                    {jc === 'center' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="8" y1="2" x2="8" y2="14"/><rect x="4.5" y="4" width="7" height="3" rx="1"/><rect x="2.5" y="9" width="11" height="3" rx="1"/>
+                      </svg>
+                    )}
+                    {jc === 'flex-end' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="14" y1="2" x2="14" y2="14"/><rect x="7" y="4" width="5" height="3" rx="1"/><rect x="4" y="9" width="8" height="3" rx="1"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+              {/* Divider */}
+              <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', alignSelf: 'stretch', margin: '2px 1px' }} />
+              {/* align-items buttons */}
+              {([
+                { t: 'Align start',  ai: 'flex-start' },
+                { t: 'Align center', ai: 'center'     },
+                { t: 'Align end',    ai: 'flex-end'   },
+              ]).map(({ t, ai }) => {
+                const active = alignItems === ai;
+                return (
+                  <button key={ai} title={t} onClick={() => handleAlignItems(ai)} style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: 26, borderRadius: 6, border: 'none', outline: 'none', cursor: 'pointer',
+                    background: active ? 'rgba(99,102,241,0.85)' : 'transparent',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.45)',
+                    boxShadow: active ? '0 1px 4px rgba(99,102,241,0.5)' : 'none',
+                    transition: 'all 0.12s',
+                  }}>
+                    {ai === 'flex-start' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="2" y1="2" x2="14" y2="2"/><rect x="4" y="4" width="3" height="5" rx="1"/><rect x="9" y="4" width="3" height="8" rx="1"/>
+                      </svg>
+                    )}
+                    {ai === 'center' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="2" y1="8" x2="14" y2="8"/><rect x="4" y="5" width="3" height="6" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/>
+                      </svg>
+                    )}
+                    {ai === 'flex-end' && (
+                      <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="2" y1="14" x2="14" y2="14"/><rect x="4" y="7" width="3" height="5" rx="1"/><rect x="9" y="4" width="3" height="8" rx="1"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 9-point transform-origin grid */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Origin</span>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 4, background: T.inputBg, border: T.inputBorder,
+              borderRadius: 8, padding: 6,
+            }}>
+              {([
+                ['top left','top center','top right'],
+                ['center left','center center','center right'],
+                ['bottom left','bottom center','bottom right'],
+              ] as const).flat().map(origin => {
+                const active = transformOrigin === origin || (origin === 'center center' && transformOrigin === 'center');
+                return (
+                  <button key={origin} title={origin} onClick={() => handleTransformOrigin(origin)} style={{
+                    height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                    background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <div style={{
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: active ? T.accent : 'rgba(255,255,255,0.25)',
+                      transition: 'background 0.15s',
+                    }} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Gap */}
+          <div>
+            <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Gap</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{
+                flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px',
+              }}>
+                {/* Gap icon — two bars with arrow between */}
+                <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
+                  <line x1="2" y1="3" x2="2" y2="13"/>
+                  <line x1="14" y1="3" x2="14" y2="13"/>
+                  <line x1="5" y1="8" x2="11" y2="8"/>
+                  <polyline points="5,6 3,8 5,10"/>
+                  <polyline points="11,6 13,8 11,10"/>
+                </svg>
+                <input
+                  defaultValue={gap}
+                  key={gap}
+                  onBlur={e => handleGap(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleGap((e.target as HTMLInputElement).value); }}
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    color: T.valueColor, fontSize: 11, fontFamily: T.font, minWidth: 0,
+                  }}
+                />
+              </div>
+              {/* Unit dropdown */}
+              <div style={{ position: 'relative' }}>
+                <select style={{
+                  appearance: 'none', WebkitAppearance: 'none',
+                  background: T.inputBg, border: T.inputBorder, borderRadius: 7,
+                  color: T.valueColor, fontSize: 11, fontFamily: T.font,
+                  padding: '5px 20px 5px 8px', outline: 'none', cursor: 'pointer',
+                }}>
+                  <option>px</option>
+                  <option>%</option>
+                  <option>rem</option>
+                </select>
+                <svg style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={8} height={8} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              </div>
+            </div>
+          </div>
         </Section>
 
         {/* ─ Section 3: Spacing ─ */}

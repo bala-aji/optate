@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
+const isDev = process.env.BUILD_MODE === 'development';
+
 export default defineConfig({
   plugins: [react()],
 
@@ -20,8 +22,10 @@ export default defineConfig({
     },
     outDir: 'dist',
     emptyOutDir: true,
-    minify: 'terser',
-    terserOptions: {
+
+    // Dev mode: no minification → React component names stay readable
+    minify: isDev ? false : 'terser',
+    terserOptions: isDev ? undefined : {
       compress: {
         drop_console: true,
         drop_debugger: true,
@@ -36,14 +40,18 @@ export default defineConfig({
         comments: false,
       },
     },
-    sourcemap: false,
+    sourcemap: isDev ? 'inline' : false,
     rollupOptions: {
       external: [],
+      output: {
+        // Preserve function names in dev so React fiber shows real component names
+        generatedCode: isDev ? { arrowFunctions: false } : undefined,
+      },
     },
   },
 
   define: {
-    'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production'),
   },
 
   css: {
