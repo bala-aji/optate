@@ -613,6 +613,17 @@ const EASING_CATEGORIES: Record<string, string[]> = {
   'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
 };
 
+// ─── Effect Item ─────────────────────────────────────────────────────────────
+
+export type EffectType = 'drop-shadow' | 'inner-shadow' | 'layer-blur' | 'background-blur';
+export interface EffectItem {
+  id: string;
+  type: EffectType;
+  visible: boolean;
+  x: number; y: number; blur: number; spread: number;
+  color: string; colorOpacity: number;
+}
+
 // ─── Gradient Editor ──────────────────────────────────────────────────────────
 
 interface GradientStop { id: string; position: number; color: string; opacity: number; }
@@ -1248,15 +1259,9 @@ export const EditorPanel: React.FC = () => {
 
   // Effects
   const [opacity, setOpacity] = useState('100');
-  const [shadowEnabled, setShadowEnabled] = useState(false);
-  const [shadowX, setShadowX] = useState('0');
-  const [shadowY, setShadowY] = useState('4');
-  const [shadowBlur, setShadowBlur] = useState('8');
-  const [shadowSpread, setShadowSpread] = useState('0');
-  const [shadowColor, setShadowColor] = useState('#000000');
-  const [backdropBlur, setBackdropBlur] = useState('0');
-  const [filterBlur, setFilterBlur] = useState('0');
   const [blendMode, setBlendMode] = useState('normal');
+  const [effects, setEffects] = useState<EffectItem[]>([]);
+  const [expandedEffectId, setExpandedEffectId] = useState<string | null>(null);
 
   // Transform
   const [rotate, setRotate] = useState('0');
@@ -1384,21 +1389,35 @@ export const EditorPanel: React.FC = () => {
 
     // Effects
     setOpacity(Math.round((parseFloat(cs.opacity) || 1) * 100).toString());
-    const shadow = cs.boxShadow;
-    if (shadow && shadow !== 'none') {
-      setShadowEnabled(true);
-      const m = shadow.match(/([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px/);
-      if (m) { setShadowX(m[1]); setShadowY(m[2]); setShadowBlur(m[3]); setShadowSpread(m[4]); }
-    } else {
-      setShadowEnabled(false);
+    setBlendMode(cs.mixBlendMode || 'normal');
+    const parsedEffects: EffectItem[] = [];
+    // Parse box-shadow (drop + inner shadow)
+    const rawShadow = cs.boxShadow;
+    if (rawShadow && rawShadow !== 'none') {
+      const shadowParts = rawShadow.split(/,(?![^(]*\))/);
+      for (const part of shadowParts) {
+        const isInner = /\binset\b/.test(part);
+        const nums = part.match(/([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px/);
+        const rgba = part.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+        parsedEffects.push({
+          id: Math.random().toString(36).slice(2), type: isInner ? 'inner-shadow' : 'drop-shadow',
+          visible: true, x: nums ? +nums[1] : 0, y: nums ? +nums[2] : 4,
+          blur: nums ? +nums[3] : 4, spread: nums ? +nums[4] : 0,
+          color: rgba ? rgbToHex(+rgba[1],+rgba[2],+rgba[3]) : '#000000',
+          colorOpacity: rgba ? Math.round((parseFloat(rgba[4]??'1'))*100) : 25,
+        });
+      }
     }
-    const bdFilter = cs.backdropFilter || '';
-    const bBlurM = bdFilter.match(/blur\(([\d.]+)px\)/);
-    setBackdropBlur(bBlurM ? bBlurM[1] : '0');
+    // Parse filter blur (layer blur)
     const filt = cs.filter || '';
     const fBlurM = filt.match(/blur\(([\d.]+)px\)/);
-    setFilterBlur(fBlurM ? fBlurM[1] : '0');
-    setBlendMode(cs.mixBlendMode || 'normal');
+    if (fBlurM && +fBlurM[1] > 0) parsedEffects.push({ id: Math.random().toString(36).slice(2), type:'layer-blur', visible:true, x:0,y:0,blur:+fBlurM[1],spread:0, color:'#000000',colorOpacity:100 });
+    // Parse backdrop-filter blur (background blur)
+    const bdFilt = cs.backdropFilter || '';
+    const bBlurM = bdFilt.match(/blur\(([\d.]+)px\)/);
+    if (bBlurM && +bBlurM[1] > 0) parsedEffects.push({ id: Math.random().toString(36).slice(2), type:'background-blur', visible:true, x:0,y:0,blur:+bBlurM[1],spread:0, color:'#000000',colorOpacity:100 });
+    setEffects(parsedEffects);
+    setExpandedEffectId(null);
 
     // Animate – transition
     const tr = el.style.transition || cs.transition || '';
@@ -1542,20 +1561,38 @@ export const EditorPanel: React.FC = () => {
 
   // Effects
   const handleOpacity = (v: string) => { setOpacity(v); applyProp('opacity', (parseFloat(v) / 100).toString()); };
-  const buildShadow = (x = shadowX, y = shadowY, b = shadowBlur, s = shadowSpread, c = shadowColor) =>
-    `${x}px ${y}px ${b}px ${s}px ${c}`;
-  const handleShadowToggle = (checked: boolean) => {
-    setShadowEnabled(checked);
-    applyProp('box-shadow', checked ? buildShadow() : 'none');
-  };
-  const handleShadowX = (v: string) => { setShadowX(v.replace('px', '')); applyProp('box-shadow', buildShadow(v.replace('px', ''))); };
-  const handleShadowY = (v: string) => { setShadowY(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, v.replace('px', ''))); };
-  const handleShadowBlur = (v: string) => { setShadowBlur(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, undefined, v.replace('px', ''))); };
-  const handleShadowSpread = (v: string) => { setShadowSpread(v.replace('px', '')); applyProp('box-shadow', buildShadow(undefined, undefined, undefined, v.replace('px', ''))); };
-  const handleShadowColor = (v: string) => { setShadowColor(v); applyProp('box-shadow', buildShadow(undefined, undefined, undefined, undefined, v)); };
-  const handleBackdropBlur = (v: string) => { setBackdropBlur(v.replace('px', '')); applyProp('backdrop-filter', `blur(${v.replace('px', '')}px)`); };
-  const handleFilterBlur = (v: string) => { setFilterBlur(v.replace('px', '')); applyProp('filter', `blur(${v.replace('px', '')}px)`); };
   const handleBlendMode = (v: string) => { setBlendMode(v); applyProp('mix-blend-mode', v); };
+
+  const applyEffects = (effs: EffectItem[]) => {
+    // box-shadow
+    const shadows = effs.filter(e => e.visible && (e.type==='drop-shadow'||e.type==='inner-shadow'));
+    if (shadows.length > 0) {
+      const css = shadows.map(e => {
+        const {r,g,b} = hexToRgb(e.color);
+        const a = (e.colorOpacity/100).toFixed(2);
+        return `${e.type==='inner-shadow'?'inset ':''}${e.x}px ${e.y}px ${e.blur}px ${e.spread}px rgba(${r},${g},${b},${a})`;
+      }).join(', ');
+      applyProp('box-shadow', css);
+    } else { applyProp('box-shadow', 'none'); }
+    // filter blur
+    const layerBlur = effs.find(e => e.visible && e.type==='layer-blur');
+    applyProp('filter', layerBlur ? `blur(${layerBlur.blur}px)` : 'none');
+    // backdrop-filter
+    const bgBlur = effs.find(e => e.visible && e.type==='background-blur');
+    applyProp('backdrop-filter', bgBlur ? `blur(${bgBlur.blur}px)` : 'none');
+  };
+
+  const addEffect = () => {
+    const ne: EffectItem = { id: Date.now().toString(36), type:'drop-shadow', visible:true, x:0, y:4, blur:4, spread:0, color:'#000000', colorOpacity:25 };
+    const next = [...effects, ne]; setEffects(next); setExpandedEffectId(ne.id); applyEffects(next);
+  };
+  const removeEffect = (id: string) => { const next = effects.filter(e=>e.id!==id); setEffects(next); applyEffects(next); };
+  const toggleEffect = (id: string) => {
+    const next = effects.map(e => e.id===id ? {...e,visible:!e.visible} : e); setEffects(next); applyEffects(next);
+  };
+  const updateEffect = (id: string, patch: Partial<EffectItem>) => {
+    const next = effects.map(e => e.id===id ? {...e,...patch} : e); setEffects(next); applyEffects(next);
+  };
 
   // Transform
   const buildTransform = (r = rotate, sx = scaleX, tx = translateX, ty = translateY) =>
@@ -2574,64 +2611,218 @@ export const EditorPanel: React.FC = () => {
         {/* ─ Section 7: Effects ─ */}
         <Section title="Effects">
           {/* Opacity */}
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 12 }}>
             <FieldLabel>Opacity</FieldLabel>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="range" min={0} max={100} value={opacity}
-                onChange={e => handleOpacity(e.target.value)}
-                style={{ flex: 1, accentColor: T.accent }}
-              />
-              <input
-                type="text" value={opacity}
-                onChange={e => handleOpacity(e.target.value)}
-                style={{
-                  width: 44, background: T.inputBg, border: T.inputBorder, borderRadius: 6,
-                  color: T.valueColor, fontSize: 12, fontFamily: T.font, padding: '3px 6px', outline: 'none', textAlign: 'center',
-                }}
-              />
+              <input type="range" min={0} max={100} value={opacity} onChange={e => handleOpacity(e.target.value)} style={{ flex: 1, accentColor: T.accent }} />
+              <input type="text" value={opacity} onChange={e => handleOpacity(e.target.value)} style={{ width: 44, background: T.inputBg, border: T.inputBorder, borderRadius: 6, color: T.valueColor, fontSize: 12, fontFamily: T.font, padding: '3px 6px', outline: 'none', textAlign: 'center' }} />
               <span style={{ fontSize: 10, color: T.labelColor }}>%</span>
             </div>
           </div>
-          {/* Box shadow */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <FieldLabel>Box Shadow</FieldLabel>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                <input type="checkbox" checked={shadowEnabled} onChange={e => handleShadowToggle(e.target.checked)}
-                  style={{ accentColor: T.accent }} />
-                <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font }}>Enable</span>
-              </label>
-            </div>
-            {shadowEnabled && (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                  <ScrubInput label="X" value={shadowX} unit="px" onChange={handleShadowX} />
-                  <ScrubInput label="Y" value={shadowY} unit="px" onChange={handleShadowY} />
-                  <ScrubInput label="Blur" value={shadowBlur} unit="px" onChange={handleShadowBlur} min={0} />
-                  <ScrubInput label="Spread" value={shadowSpread} unit="px" onChange={handleShadowSpread} />
-                </div>
-                <ColorSwatch value={shadowColor} onChange={handleShadowColor} />
-              </>
-            )}
-          </div>
-          {/* Backdrop blur */}
-          <div style={{ marginBottom: 8 }}>
-            <ScrubInput label="Backdrop Blur" value={backdropBlur} unit="px" onChange={handleBackdropBlur} min={0} />
-          </div>
-          {/* Filter blur */}
-          <div style={{ marginBottom: 8 }}>
-            <ScrubInput label="Filter Blur" value={filterBlur} unit="px" onChange={handleFilterBlur} min={0} />
-          </div>
+
           {/* Blend mode */}
-          <div>
+          <div style={{ marginBottom: 14 }}>
             <FieldLabel>Blend Mode</FieldLabel>
-            <SmallSelect
-              value={blendMode}
-              onChange={handleBlendMode}
-              options={['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
-                'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion']}
-            />
+            <SmallSelect value={blendMode} onChange={handleBlendMode} options={['normal','multiply','screen','overlay','darken','lighten','color-dodge','color-burn','hard-light','soft-light','difference','exclusion']} />
+          </div>
+
+          {/* ── Effects list (Figma-style) ── */}
+          <div>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <span style={{ fontSize:11, fontWeight:600, color:T.valueColor, fontFamily:T.font }}>Effects</span>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                {/* Grid view icon */}
+                <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color:T.labelColor }}>
+                  <rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/>
+                  <rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>
+                </svg>
+                {/* Add button */}
+                <button onClick={addEffect} style={{ width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:6, cursor:'pointer', color:T.labelColor, fontSize:16, lineHeight:1 }}>+</button>
+              </div>
+            </div>
+
+            {/* Effect rows */}
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {effects.length === 0 && (
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontFamily:T.font, textAlign:'center', padding:'12px 0' }}>
+                  No effects. Click + to add one.
+                </div>
+              )}
+              {effects.map(eff => {
+                const isExpanded = expandedEffectId === eff.id;
+                const isShadow = eff.type==='drop-shadow'||eff.type==='inner-shadow';
+                const isBlur = eff.type==='layer-blur'||eff.type==='background-blur';
+                // Preview color
+                const previewBg = isShadow ? eff.color : T.accent;
+                const EFFECT_LABELS: Record<EffectType,string> = { 'drop-shadow':'Drop shadow', 'inner-shadow':'Inner shadow', 'layer-blur':'Layer blur', 'background-blur':'Background blur' };
+                return (
+                  <div key={eff.id}>
+                    {/* Row */}
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      {/* Color/preview square */}
+                      <div onClick={()=>setExpandedEffectId(isExpanded ? null : eff.id)} style={{
+                        width:28, height:28, borderRadius:6, flexShrink:0, cursor:'pointer',
+                        background: isShadow ? `rgba(59,130,246,0.15)` : 'rgba(99,102,241,0.15)',
+                        border:'1.5px solid rgba(59,130,246,0.5)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        <div style={{ width:14, height:14, borderRadius:3, background:previewBg, border:'1.5px solid rgba(255,255,255,0.25)', boxShadow: isShadow ? `1px 2px 4px ${eff.color}` : 'none' }} />
+                      </div>
+                      {/* Type dropdown */}
+                      <div style={{ position:'relative', flex:1 }}>
+                        <select value={eff.type} onChange={e=>{ updateEffect(eff.id,{type:e.target.value as EffectType}); }} style={{
+                          width:'100%', appearance:'none', WebkitAppearance:'none',
+                          background:T.inputBg, border:T.inputBorder, borderRadius:7,
+                          color:T.valueColor, fontFamily:T.font, fontSize:11,
+                          padding:'5px 24px 5px 8px', cursor:'pointer', outline:'none',
+                        }}>
+                          <option value="drop-shadow">Drop shadow</option>
+                          <option value="inner-shadow">Inner shadow</option>
+                          <option value="layer-blur">Layer blur</option>
+                          <option value="background-blur">Background blur</option>
+                        </select>
+                        <svg style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={9} height={9} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                      </div>
+                      {/* Visibility toggle */}
+                      <button onClick={()=>toggleEffect(eff.id)} title={eff.visible?'Hide':'Show'} style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color: eff.visible ? T.valueColor : 'rgba(255,255,255,0.2)', padding:0 }}>
+                        {eff.visible
+                          ? <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="2"/></svg>
+                          : <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="2" x2="14" y2="14"/><path d="M6.5 3.5A7 4 0 0 1 14 8"/><path d="M2 6a7 4 0 0 0 8.5 5.5"/></svg>
+                        }
+                      </button>
+                      {/* Delete */}
+                      <button onClick={()=>removeEffect(eff.id)} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
+                        <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="1" y1="6" x2="11" y2="6"/></svg>
+                      </button>
+                    </div>
+
+                    {/* Expanded editor */}
+                    {isExpanded && (
+                      <div style={{ marginTop:8, padding:'12px 12px 10px', background:'rgba(255,255,255,0.04)', borderRadius:10, border:T.inputBorder }}>
+                        {/* Header row */}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                          <div style={{ position:'relative', flex:1 }}>
+                            <select value={eff.type} onChange={e=>updateEffect(eff.id,{type:e.target.value as EffectType})} style={{
+                              appearance:'none', WebkitAppearance:'none', background:'transparent', border:'none', outline:'none',
+                              color:T.valueColor, fontFamily:T.font, fontSize:12, fontWeight:600, cursor:'pointer', padding:'0 18px 0 0',
+                            }}>
+                              <option value="drop-shadow">Drop shadow</option>
+                              <option value="inner-shadow">Inner shadow</option>
+                              <option value="layer-blur">Layer blur</option>
+                              <option value="background-blur">Background blur</option>
+                            </select>
+                            <svg style={{ position:'absolute', right:2, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={9} height={9} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            {/* Waterdrop / blur icon */}
+                            {isShadow && (
+                              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color:T.labelColor }}>
+                                <path d="M8 2 C8 2 3 8 3 11a5 5 0 0 0 10 0C13 8 8 2 8 2Z"/>
+                              </svg>
+                            )}
+                            {isBlur && (
+                              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color:T.labelColor }}>
+                                <circle cx="8" cy="8" r="5" strokeDasharray="2 2"/>
+                                <circle cx="8" cy="8" r="2"/>
+                              </svg>
+                            )}
+                            {/* Close */}
+                            <button onClick={()=>setExpandedEffectId(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.labelColor, padding:2, display:'flex', alignItems:'center' }}>
+                              <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Shadow-specific fields */}
+                        {isShadow && (
+                          <>
+                            {/* Position */}
+                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Position</span>
+                              <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
+                                {/* X */}
+                                <div style={{ display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                                  <span style={{ fontSize:10, color:T.labelColor, fontFamily:T.font, width:10 }}>X</span>
+                                  <input type="number" value={eff.x} onChange={e=>updateEffect(eff.id,{x:+e.target.value})}
+                                    style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
+                                </div>
+                                {/* Y */}
+                                <div style={{ display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                                  <span style={{ fontSize:10, color:T.labelColor, fontFamily:T.font, width:10 }}>Y</span>
+                                  <input type="number" value={eff.y} onChange={e=>updateEffect(eff.id,{y:+e.target.value})}
+                                    style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
+                                </div>
+                              </div>
+                            </div>
+                            {/* Blur */}
+                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Blur</span>
+                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                                {/* blur icon */}
+                                <svg width={13} height={13} viewBox="0 0 16 16" fill="none" style={{ color:T.labelColor, flexShrink:0 }}>
+                                  <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                                  <circle cx="4" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
+                                  <circle cx="12" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
+                                  <circle cx="8" cy="4" r="1.2" fill="currentColor" opacity=".5"/>
+                                  <circle cx="8" cy="12" r="1.2" fill="currentColor" opacity=".5"/>
+                                  <circle cx="5.2" cy="5.2" r="0.8" fill="currentColor" opacity=".3"/>
+                                  <circle cx="10.8" cy="10.8" r="0.8" fill="currentColor" opacity=".3"/>
+                                </svg>
+                                <input type="number" min={0} value={eff.blur} onChange={e=>updateEffect(eff.id,{blur:+e.target.value})}
+                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
+                              </div>
+                            </div>
+                            {/* Spread */}
+                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Spread</span>
+                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                                {/* spread icon */}
+                                <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ color:T.labelColor, flexShrink:0 }}>
+                                  <circle cx="8" cy="8" r="3" strokeDasharray="1.5 1.5"/>
+                                  <circle cx="8" cy="8" r="6" strokeDasharray="1.5 1.5" opacity=".4"/>
+                                </svg>
+                                <input type="number" value={eff.spread} onChange={e=>updateEffect(eff.id,{spread:+e.target.value})}
+                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
+                              </div>
+                            </div>
+                            {/* Color row */}
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Color</span>
+                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                                {/* Swatch */}
+                                <div style={{ position:'relative', width:18, height:18, borderRadius:3, background:eff.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
+                                  <input type="color" value={eff.color} onChange={e=>updateEffect(eff.id,{color:e.target.value})}
+                                    style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
+                                </div>
+                                {/* Hex */}
+                                <input value={eff.color.replace('#','').toUpperCase()} onChange={e=>{ const raw=e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if(raw.length===6) updateEffect(eff.id,{color:'#'+raw}); }}
+                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }} />
+                                {/* Opacity */}
+                                <input type="number" min={0} max={100} value={eff.colorOpacity} onChange={e=>updateEffect(eff.id,{colorOpacity:Math.max(0,Math.min(100,+e.target.value))})}
+                                  style={{ width:30, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font, textAlign:'right' }} />
+                                <span style={{ fontSize:10, color:T.labelColor }}>%</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Blur-only fields */}
+                        {isBlur && (
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Blur</span>
+                            <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
+                              <input type="number" min={0} value={eff.blur} onChange={e=>updateEffect(eff.id,{blur:+e.target.value})}
+                                style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </Section>
 
