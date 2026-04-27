@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+// @ts-ignore
+import logoIcon from '../../src/logo-icon.png?inline';
+// @ts-ignore
+import logoFull from '../../src/logo-full.png?inline';
 import { useSelection, ViewportMode } from '@/lib/selection-context';
 import { ElementSelector } from '@/components/Inspector/ElementSelector';
 import { ElementHighlighter } from '@/components/Inspector/ElementHighlighter';
@@ -346,22 +350,11 @@ export const PanelShell: React.FC<PanelShellProps> = ({
             </svg>
           </ToolbarButton>
 
-          {/* Optate logo */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="og1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#a855f7" />
-                  <stop offset="50%" stopColor="#ec4899" />
-                  <stop offset="100%" stopColor="#22d3ee" />
-                </linearGradient>
-              </defs>
-              <circle cx="50" cy="50" r="48" stroke="url(#og1)" strokeWidth="10" fill="none" />
-              <circle cx="50" cy="50" r="14" fill="url(#og1)" />
-              {/* cursor arrow */}
-              <path d="M54 54 L72 68 L66 70 L70 80 L64 83 L60 73 L54 78 Z" fill="url(#og1)" opacity="0.9" />
-            </svg>
-          </div>
+          {/* Optate wordmark */}
+          <span style={{
+            fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.88)',
+            letterSpacing: '-0.03em', padding: '0 4px', userSelect: 'none',
+          }}>optate</span>
 
           <ToolbarDivider />
 
@@ -1211,14 +1204,7 @@ const TriggerBubble: React.FC = () => {
         fontFamily: `-apple-system, BlinkMacSystemFont, system-ui, sans-serif`,
       }}
     >
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="10" r="8" stroke="#f97316" strokeWidth="1.8"/>
-        <circle cx="10" cy="10" r="3.5" fill="#f97316"/>
-        <line x1="10" y1="2" x2="10" y2="0" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round"/>
-        <line x1="10" y1="20" x2="10" y2="18" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round"/>
-        <line x1="2" y1="10" x2="0" y2="10" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round"/>
-        <line x1="20" y1="10" x2="18" y2="10" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round"/>
-      </svg>
+      <img src={logoIcon} alt="Optate" width={26} height={26} style={{ display: 'block', objectFit: 'contain' }} />
     </div>
   );
 };

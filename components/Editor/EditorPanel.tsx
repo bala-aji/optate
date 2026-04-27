@@ -843,6 +843,7 @@ const EffectPopover: React.FC<{
         boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
         padding: '14px 16px 16px',
         fontFamily: T.font,
+        pointerEvents: 'auto',
       }}
     >
       {/* Header */}
@@ -875,19 +876,19 @@ const EffectPopover: React.FC<{
       {/* Shadow fields */}
       {isShadow && (
         <>
-          {/* Position */}
+          {/* Position X / Y — horizontal */}
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
             <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Position</span>
-            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
-                <span style={{ fontSize:11, color: T.labelColor, width:10 }}>X</span>
+            <div style={{ flex:1, display:'flex', gap:6 }}>
+              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 8px' }}>
+                <span style={{ fontSize:10, color: T.labelColor, flexShrink:0 }}>X</span>
                 <input type="number" value={eff.x} onChange={e => onUpdate({ x: +e.target.value })}
-                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+                  style={{ width:0, flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
-                <span style={{ fontSize:11, color: T.labelColor, width:10 }}>Y</span>
+              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 8px' }}>
+                <span style={{ fontSize:10, color: T.labelColor, flexShrink:0 }}>Y</span>
                 <input type="number" value={eff.y} onChange={e => onUpdate({ y: +e.target.value })}
-                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+                  style={{ width:0, flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
               </div>
             </div>
           </div>
@@ -924,17 +925,23 @@ const EffectPopover: React.FC<{
           {/* Color */}
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Color</span>
-            <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
-              <div style={{ position:'relative', width:20, height:20, borderRadius:4, background: eff.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
-                <input type="color" value={eff.color} onChange={e => onUpdate({ color: e.target.value })}
-                  style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              {/* swatch + hex */}
+              <div style={{ display:'flex', alignItems:'center', gap:6, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 8px' }}>
+                <div style={{ position:'relative', width:18, height:18, borderRadius:3, background: eff.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
+                  <input type="color" value={eff.color} onChange={e => onUpdate({ color: e.target.value })}
+                    style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
+                </div>
+                <input value={eff.color.replace('#','').toUpperCase()}
+                  onChange={e => { const raw = e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if (raw.length===6) onUpdate({ color:'#'+raw }); }}
+                  style={{ width:56, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }} />
               </div>
-              <input value={eff.color.replace('#','').toUpperCase()}
-                onChange={e => { const raw = e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if (raw.length===6) onUpdate({ color:'#'+raw }); }}
-                style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }} />
-              <input type="number" min={0} max={100} value={eff.colorOpacity} onChange={e => onUpdate({ colorOpacity: Math.max(0,Math.min(100,+e.target.value)) })}
-                style={{ width:32, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font, textAlign:'right' }} />
-              <span style={{ fontSize:10, color: T.labelColor, flexShrink:0 }}>%</span>
+              {/* opacity */}
+              <div style={{ display:'flex', alignItems:'center', gap:4, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 8px', width:58 }}>
+                <input type="number" min={0} max={100} value={eff.colorOpacity} onChange={e => onUpdate({ colorOpacity: Math.max(0,Math.min(100,+e.target.value)) })}
+                  style={{ width:0, flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font, textAlign:'right' }} />
+                <span style={{ fontSize:10, color: T.labelColor, flexShrink:0 }}>%</span>
+              </div>
             </div>
           </div>
         </>
@@ -1423,6 +1430,24 @@ export const EditorPanel: React.FC = () => {
   const animPreviewRef = useRef<any>(null);
   const animOriginalStyles = useRef<Record<string, string>>({});
   const miniPreviewRef = useRef<HTMLDivElement>(null);
+
+  // ── Panel DOM refs (must be before conditional returns) ───────────────────
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+
+  // ── Click-away: close effect popover when clicking outside the panel ──────
+  useEffect(() => {
+    if (!expandedEffectId) return;
+    function onMouseDown(e: MouseEvent) {
+      const path = e.composedPath ? e.composedPath() : [];
+      if (wrapperRef.current && path.includes(wrapperRef.current as EventTarget)) return;
+      setExpandedEffectId(null);
+      setEffectAnchorRect(null);
+      setEffectPanelRect(null);
+    }
+    document.addEventListener('mousedown', onMouseDown, true);
+    return () => document.removeEventListener('mousedown', onMouseDown, true);
+  }, [expandedEffectId]);
 
   // ── Inject keyframes once ────────────────────────────────────────────────
   useEffect(() => {
@@ -1931,13 +1956,22 @@ export const EditorPanel: React.FC = () => {
   const elClass = el.classList.length > 0 ? `.${el.classList[0]}` : '';
   const elIdentifier = elId || elClass || '';
 
-  const panelStyle: React.CSSProperties = {
+  // Outer wrapper: fixed position + z-index only — NO overflow, NO transform
+  const wrapperStyle: React.CSSProperties = {
     position: 'fixed',
     top: 12,
     bottom: 12,
     [panelSide]: 12,
     width: 260,
     zIndex: 2147483642,
+    overflow: 'visible',
+    pointerEvents: 'none',
+  };
+
+  // Inner panel: has overflow:hidden + slide-in animation
+  const panelStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
     background: T.panelBg,
     backdropFilter: 'blur(40px) saturate(180%)',
     border: T.border,
@@ -1949,13 +1983,13 @@ export const EditorPanel: React.FC = () => {
     overflow: 'hidden',
     transform: mounted ? 'none' : `translateX(${panelSide === 'right' ? '120%' : '-120%'})`,
     transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+    pointerEvents: 'auto',
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const panelRef = useRef<HTMLDivElement>(null);
-
   return (
+    <div ref={wrapperRef} style={wrapperStyle}>
     <div ref={panelRef} style={panelStyle} onClick={() => showDomTree && setShowDomTree(false)}>
       {/* ── Upload Modal ── */}
       {uploadPending && (
@@ -2753,6 +2787,7 @@ export const EditorPanel: React.FC = () => {
                     {/* Preview square — click opens floating popover */}
                     <div
                       onClick={e => {
+                        e.stopPropagation();
                         if (isExpanded) { setExpandedEffectId(null); setEffectAnchorRect(null); setEffectPanelRect(null); }
                         else {
                           setExpandedEffectId(eff.id);
@@ -2799,25 +2834,6 @@ export const EditorPanel: React.FC = () => {
             </div>
           </div>
         </Section>
-
-        {/* ── Effect floating popover (portal) ── */}
-        {expandedEffectId && effectAnchorRect && effectPanelRect && (() => {
-          const eff = effects.find(e => e.id === expandedEffectId);
-          if (!eff) return null;
-          const closePopover = () => { setExpandedEffectId(null); setEffectAnchorRect(null); setEffectPanelRect(null); };
-          return (
-            <>
-              <div style={{ position:'fixed', inset:0, zIndex:2147483644 }} onClick={closePopover} />
-              <EffectPopover
-                eff={eff}
-                anchorRect={effectAnchorRect}
-                panelRect={effectPanelRect}
-                onUpdate={patch => updateEffect(eff.id, patch)}
-                onClose={closePopover}
-              />
-            </>
-          );
-        })()}
 
         {/* ─ Section 8: Transform ─ */}
         <Section title="Transform">
@@ -3025,6 +3041,26 @@ export const EditorPanel: React.FC = () => {
         {/* bottom padding */}
         <div style={{ height: 12 }} />
       </div>
+    </div>{/* end inner panel */}
+
+    {/* ── Effect floating popover — sibling to inner panel, outside overflow:hidden ── */}
+    {expandedEffectId && effectAnchorRect && (() => {
+      const eff = effects.find(e => e.id === expandedEffectId);
+      if (!eff) return null;
+      const panelRect = panelRef.current?.getBoundingClientRect() ?? null;
+      if (!panelRect) return null;
+      const closePopover = () => { setExpandedEffectId(null); setEffectAnchorRect(null); setEffectPanelRect(null); };
+      return (
+        <EffectPopover
+          eff={eff}
+          anchorRect={effectAnchorRect}
+          panelRect={panelRect}
+          onUpdate={patch => updateEffect(eff.id, patch)}
+          onClose={closePopover}
+        />
+      );
+    })()}
+
     </div>
   );
 };
