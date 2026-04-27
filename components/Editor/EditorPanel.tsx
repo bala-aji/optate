@@ -1963,7 +1963,7 @@ export const EditorPanel: React.FC = () => {
     bottom: 12,
     [panelSide]: 12,
     width: 260,
-    zIndex: 2147483642,
+    zIndex: 2147483646,
     overflow: 'visible',
     pointerEvents: 'none',
   };
