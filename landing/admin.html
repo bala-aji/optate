@@ -175,6 +175,16 @@
       background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.85);
     }
 
+    /* ── Visitor cards ── */
+    .visitor-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:28px; }
+    @media(max-width:600px){ .visitor-stats { grid-template-columns:1fr 1fr; } }
+
+    .flag { font-size:16px; }
+    .device-icon { font-size:13px; width:18px; text-align:center; }
+    .browser-dot {
+      width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0;
+    }
+
     /* ── Skeleton loader ── */
     .skeleton {
       background: linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);
@@ -364,6 +374,65 @@
     </div>
   </div>
 
+  <!-- ── Visitor Analytics ── -->
+  <div class="section-title" style="margin-top:8px">Visitor analytics</div>
+
+  <!-- Visitor KPIs -->
+  <div class="visitor-stats" id="visitorKpis">
+    <div class="stat-card">
+      <div class="stat-label">Total visitors</div>
+      <div class="stat-value" id="vTotal"><span class="skeleton skel-num"></span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unique countries</div>
+      <div class="stat-value" id="vCountries"><span class="skeleton skel-num"></span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Top device</div>
+      <div class="stat-value" id="vTopDevice" style="font-size:18px"><span class="skeleton skel-num"></span></div>
+    </div>
+  </div>
+
+  <!-- Visitors + Countries side by side -->
+  <div class="two-col" style="margin-bottom:28px">
+
+    <!-- Recent visitors -->
+    <div>
+      <div class="section-title">Recent visitors</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Device / OS</th>
+              <th>Browser</th>
+              <th>When</th>
+            </tr>
+          </thead>
+          <tbody id="visitorsBody">
+            <tr><td colspan="4"><span class="skeleton" style="height:12px;width:90%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Top countries -->
+    <div>
+      <div class="section-title">Top countries</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>Country</th><th>Visits</th><th style="width:90px"></th></tr>
+          </thead>
+          <tbody id="countriesBody">
+            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:90%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
   <!-- Bottom two columns -->
   <div class="two-col">
 
@@ -432,6 +501,94 @@ function relDate(iso) {
 
 let chartInstance = null;
 
+// ── Visitor helpers ───────────────────────────────────────────────────────────
+const BROWSER_COLORS = { Chrome:'#4285f4', Firefox:'#ff7139', Safari:'#006cff', Edge:'#0078d4', Opera:'#ff1b2d', Other:'#888' };
+const DEVICE_ICON = { Desktop:'🖥', Mobile:'📱', Tablet:'📟' };
+const FLAG_URL = cc => `https://flagcdn.com/16x12/${cc.toLowerCase()}.png`;
+
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400)return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
+async function loadVisitors() {
+  try {
+    const res  = await fetch('/api/visitors');
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    renderVisitorKPIs(data);
+    renderVisitorsTable(data.visitors || []);
+    renderCountriesTable(data.countries || []);
+  } catch (e) {
+    document.getElementById('visitorsBody').innerHTML =
+      `<tr><td colspan="4" style="color:rgba(239,68,68,0.7);font-size:12px;padding:16px 18px">
+        ⚠ Could not load visitor data — check Upstash env vars.
+      </td></tr>`;
+    document.getElementById('countriesBody').innerHTML =
+      `<tr><td colspan="3" style="color:rgba(239,68,68,0.7);font-size:12px;padding:16px 18px">—</td></tr>`;
+  }
+}
+
+function renderVisitorKPIs(data) {
+  const visitors = data.visitors || [];
+  document.getElementById('vTotal').textContent = fmtFull(visitors.length);
+  document.getElementById('vCountries').textContent = (data.countries || []).length;
+
+  // Top device
+  const deviceCount = {};
+  visitors.forEach(v => { deviceCount[v.device] = (deviceCount[v.device]||0)+1; });
+  const topDevice = Object.entries(deviceCount).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('vTopDevice').textContent = topDevice
+    ? `${DEVICE_ICON[topDevice[0]] || '?'} ${topDevice[0]}`
+    : '—';
+}
+
+function renderVisitorsTable(visitors) {
+  const tbody = document.getElementById('visitorsBody');
+  if (!visitors.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No visitors yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = visitors.slice(0, 50).map(v => {
+    const flag = v.countryCode
+      ? `<img src="${FLAG_URL(v.countryCode)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:5px">`
+      : '';
+    const loc = [v.city, v.country].filter(Boolean).join(', ') || v.ip;
+    const browserColor = BROWSER_COLORS[v.browser] || '#888';
+    return `<tr>
+      <td>${flag}<span style="font-size:12px">${loc}</span></td>
+      <td><span style="font-size:13px;margin-right:4px">${DEVICE_ICON[v.device]||'?'}</span>${v.os}</td>
+      <td>
+        <span class="browser-dot" style="background:${browserColor}"></span>${v.browser}
+      </td>
+      <td style="color:rgba(235,235,245,0.35);white-space:nowrap">${timeAgo(v.ts)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCountriesTable(countries) {
+  const tbody = document.getElementById('countriesBody');
+  if (!countries.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No data yet</td></tr>`;
+    return;
+  }
+  const maxCount = countries[0]?.count || 1;
+  tbody.innerHTML = countries.map(c => {
+    const pct = Math.round((c.count / maxCount) * 90);
+    const flag = c.code
+      ? `<img src="${FLAG_URL(c.code)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:6px">`
+      : '';
+    return `<tr>
+      <td>${flag}${c.name}</td>
+      <td style="color:rgba(235,235,245,0.85);font-weight:600">${fmtFull(c.count)}</td>
+      <td><div class="bar-cell"><div class="mini-bar" style="width:${pct}px;max-width:90px;background:rgba(34,211,238,0.5)"></div></div></td>
+    </tr>`;
+  }).join('');
+}
+
 async function loadAll() {
   const btn = document.getElementById('refreshBtn');
   btn.classList.add('spinning');
@@ -449,6 +606,7 @@ async function loadAll() {
     renderChart(dlRange);
     renderVersions(registry);
     renderDaily(dlRange);
+    await loadVisitors();
 
     document.getElementById('latestVersion').textContent = 'v' + (registry['dist-tags']?.latest ?? '—');
     document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
