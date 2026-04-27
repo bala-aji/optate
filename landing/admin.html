@@ -19,9 +19,9 @@
     /* ── Topbar ── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 28px;
+      padding: 12px 28px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
-      background: rgba(14,14,16,0.9);
+      background: rgba(10,10,11,0.95);
       position: sticky; top: 0; z-index: 100;
       backdrop-filter: blur(20px);
     }
@@ -42,9 +42,7 @@
       border: 1px solid rgba(52,211,153,0.18);
       padding: 3px 10px; border-radius: 20px;
     }
-    .last-updated {
-      font-size: 11px; color: rgba(235,235,245,0.28);
-    }
+    .last-updated { font-size: 11px; color: rgba(235,235,245,0.28); }
     .refresh-btn {
       display: flex; align-items: center; gap: 5px;
       font-size: 12px; font-weight: 500;
@@ -58,6 +56,140 @@
     .refresh-btn:hover { background: rgba(255,255,255,0.09); color: rgba(235,235,245,0.85); }
     .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Analytics Hero ── */
+    .analytics-hero {
+      background: #0a0a0b;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .analytics-hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px 0;
+    }
+    .analytics-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .analytics-title {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: rgba(235,235,245,0.96);
+    }
+    .analytics-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .date-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .date-select-wrap svg { color: rgba(235,235,245,0.4); flex-shrink: 0; }
+    .date-select {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: rgba(235,235,245,0.78);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .date-select option { background: #18181b; }
+    .date-badge {
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(235,235,245,0.4);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 5px 11px;
+      border-radius: 7px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Hero stats row ── */
+    .hero-stats-row {
+      display: flex;
+      align-items: stretch;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .hstat {
+      flex: 1;
+      padding: 18px 22px;
+      min-width: 0;
+    }
+    .hstat-sep {
+      width: 1px;
+      background: rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .hstat-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: rgba(235,235,245,0.35);
+      margin-bottom: 7px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .hstat-val {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: rgba(235,235,245,0.93);
+      line-height: 1;
+    }
+    /* Pulsing live dot */
+    .live-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #3b82f6;
+      flex-shrink: 0;
+      animation: livePulse 2s infinite;
+    }
+    @keyframes livePulse {
+      0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.6); }
+      70%  { box-shadow: 0 0 0 7px rgba(59,130,246,0); }
+      100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+    }
+
+    /* ── Hero chart ── */
+    .hero-chart-wrap { position: relative; padding: 20px 0 0; }
+    .hero-chart-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2px;
+      margin-bottom: 12px;
+    }
+    .hero-chart-legend {
+      display: flex;
+      gap: 16px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: rgba(235,235,245,0.38);
+    }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+    }
+    canvas#analyticsChart { width: 100% !important; height: 220px !important; display: block; }
 
     /* ── Layout ── */
     .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
@@ -83,56 +215,22 @@
       border: 1px solid rgba(255,255,255,0.07);
       border-radius: 14px;
       padding: 18px 20px;
-      position: relative;
-      overflow: hidden;
+      position: relative; overflow: hidden;
     }
     .stat-card::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: var(--card-glow, transparent);
-      opacity: 0.04;
-      pointer-events: none;
+      content: ''; position: absolute; inset: 0;
+      background: var(--card-glow, transparent); opacity: 0.04; pointer-events: none;
     }
-    .stat-label {
-      font-size: 11px; color: rgba(235,235,245,0.38);
-      letter-spacing: 0.02em; margin-bottom: 8px;
-    }
-    .stat-value {
-      font-size: 28px; font-weight: 700; letter-spacing: -0.03em;
-      color: rgba(235,235,245,0.92); line-height: 1;
-    }
-    .stat-sub {
-      font-size: 11px; color: rgba(235,235,245,0.28);
-      margin-top: 6px;
-    }
+    .stat-label { font-size: 11px; color: rgba(235,235,245,0.38); letter-spacing: 0.02em; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: rgba(235,235,245,0.92); line-height: 1; }
+    .stat-sub { font-size: 11px; color: rgba(235,235,245,0.28); margin-top: 6px; }
     .stat-trend {
       display: inline-flex; align-items: center; gap: 3px;
       font-size: 11px; font-weight: 600;
-      padding: 2px 7px; border-radius: 6px;
-      margin-top: 6px;
+      padding: 2px 7px; border-radius: 6px; margin-top: 6px;
     }
     .trend-up { color: #34d399; background: rgba(52,211,153,0.1); }
     .trend-neutral { color: rgba(235,235,245,0.35); background: rgba(255,255,255,0.05); }
-
-    /* ── Chart card ── */
-    .chart-card {
-      background: rgba(255,255,255,0.035);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 16px;
-      padding: 20px 22px;
-      margin-bottom: 28px;
-    }
-    .chart-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .chart-title { font-size: 13px; font-weight: 600; color: rgba(235,235,245,0.8); }
-    .chart-total {
-      font-size: 13px; font-weight: 600;
-      color: rgba(168,85,247,0.85);
-    }
-    .chart-wrap { position: relative; height: 180px; }
-    canvas#downloadChart { width: 100% !important; height: 180px !important; }
 
     /* ── Two col ── */
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -142,14 +240,7 @@
     .table-card {
       background: rgba(255,255,255,0.035);
       border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 16px;
-      overflow: hidden;
-      margin-bottom: 28px;
-    }
-    .table-header {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      font-size: 13px; font-weight: 600; color: rgba(235,235,245,0.8);
+      border-radius: 16px; overflow: hidden; margin-bottom: 28px;
     }
     table { width: 100%; border-collapse: collapse; }
     th {
@@ -159,8 +250,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     td {
-      padding: 10px 18px; font-size: 12px;
-      color: rgba(235,235,245,0.65);
+      padding: 10px 18px; font-size: 12px; color: rgba(235,235,245,0.65);
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     tr:last-child td { border-bottom: none; }
@@ -171,9 +261,7 @@
       padding: 2px 7px; border-radius: 5px;
       background: rgba(52,211,153,0.1); color: rgba(52,211,153,0.85);
     }
-    .tag.latest {
-      background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.85);
-    }
+    .tag.latest { background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.85); }
 
     /* ── Visitor cards ── */
     .visitor-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:28px; }
@@ -181,9 +269,7 @@
 
     .flag { font-size:16px; }
     .device-icon { font-size:13px; width:18px; text-align:center; }
-    .browser-dot {
-      width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0;
-    }
+    .browser-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0; }
 
     /* ── Skeleton loader ── */
     .skeleton {
@@ -198,8 +284,7 @@
 
     /* ── Error banner ── */
     .error-banner {
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.2);
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
       border-radius: 10px; padding: 12px 16px;
       font-size: 12px; color: rgba(239,68,68,0.8);
       margin-bottom: 20px; display: none;
@@ -207,18 +292,12 @@
 
     /* ── Mini bar chart inside table ── */
     .bar-cell { display: flex; align-items: center; gap: 8px; }
-    .mini-bar {
-      height: 4px; border-radius: 2px;
-      background: rgba(168,85,247,0.5);
-      transition: width 0.5s ease;
-    }
+    .mini-bar { height: 4px; border-radius: 2px; background: rgba(168,85,247,0.5); transition: width 0.5s ease; }
 
     /* ── Login overlay ── */
     #loginOverlay {
-      display: none;
-      position: fixed; inset: 0; z-index: 9999;
-      background: #0a0a0b;
-      align-items: center; justify-content: center;
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0b; align-items: center; justify-content: center;
     }
     #appShell { display: none; }
 
@@ -226,20 +305,12 @@
       width: 100%; max-width: 380px;
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 20px;
-      padding: 36px 32px;
-      margin: 16px;
+      border-radius: 20px; padding: 36px 32px; margin: 16px;
     }
     .login-logo { margin-bottom: 24px; }
     .login-logo img { height: 20px; }
-    .login-title {
-      font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
-      color: rgba(235,235,245,0.92); margin-bottom: 4px;
-    }
-    .login-sub {
-      font-size: 13px; color: rgba(235,235,245,0.35);
-      margin-bottom: 28px;
-    }
+    .login-title { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: rgba(235,235,245,0.92); margin-bottom: 4px; }
+    .login-sub { font-size: 13px; color: rgba(235,235,245,0.35); margin-bottom: 28px; }
     .login-field { margin-bottom: 14px; }
     .login-field label {
       display: block; font-size: 11px; font-weight: 600;
@@ -248,28 +319,22 @@
     }
     .login-field input {
       width: 100%; padding: 11px 14px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
       border-radius: 10px; outline: none;
       color: rgba(235,235,245,0.9); font-size: 14px;
       font-family: inherit; transition: border-color 0.15s;
     }
     .login-field input:focus { border-color: rgba(168,85,247,0.6); }
     .login-error {
-      display: none;
-      font-size: 12px; color: rgba(239,68,68,0.85);
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.18);
-      border-radius: 8px; padding: 9px 12px;
-      margin-bottom: 14px;
+      display: none; font-size: 12px; color: rgba(239,68,68,0.85);
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.18);
+      border-radius: 8px; padding: 9px 12px; margin-bottom: 14px;
     }
     .login-btn {
       width: 100%; padding: 12px;
-      background: rgba(168,85,247,0.85);
-      border: none; border-radius: 10px;
+      background: rgba(168,85,247,0.85); border: none; border-radius: 10px;
       color: #fff; font-size: 14px; font-weight: 600;
-      font-family: inherit; cursor: pointer;
-      transition: background 0.15s; letter-spacing: -0.01em;
+      font-family: inherit; cursor: pointer; transition: background 0.15s; letter-spacing: -0.01em;
     }
     .login-btn:hover:not(:disabled) { background: rgba(168,85,247,1); }
     .login-btn:disabled { opacity: 0.6; cursor: default; }
@@ -280,6 +345,13 @@
       40%,80%  { transform: translateX(6px); }
     }
     @keyframes fadeOut { to { opacity: 0; } }
+
+    @media (max-width: 640px) {
+      .hero-stats-row { flex-wrap: wrap; }
+      .hstat { flex: 0 0 50%; }
+      .hstat-sep { display: none; }
+      .analytics-title { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
@@ -305,7 +377,7 @@
   </div>
 </div>
 
-<!-- Dashboard (hidden until logged in) -->
+<!-- Dashboard -->
 <div id="appShell">
 
 <!-- Topbar -->
@@ -319,10 +391,15 @@
     <span class="last-updated" id="lastUpdated">—</span>
     <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/>
-        <path d="M13.5 2v3.5H10"/>
+        <path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/><path d="M13.5 2v3.5H10"/>
       </svg>
       Refresh
+    </button>
+    <button class="refresh-btn" id="resetBtn" onclick="resetAnalytics()" style="color:rgba(239,68,68,0.7);border-color:rgba(239,68,68,0.15)">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 8a6 6 0 1 0 1.5-3.93"/><path d="M2 3v3.5H5.5"/>
+      </svg>
+      Reset data
     </button>
     <button class="refresh-btn" id="logoutBtn" style="color:rgba(239,68,68,0.7);border-color:rgba(239,68,68,0.15)">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -333,16 +410,90 @@
   </div>
 </div>
 
+<!-- ── Analytics Hero ── -->
+<div class="analytics-hero">
+  <div class="analytics-hero-inner">
+
+    <!-- Title row -->
+    <div class="analytics-title-row">
+      <h1 class="analytics-title">Analytics</h1>
+      <div class="analytics-controls">
+        <div class="date-select-wrap">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="12" height="12" rx="2"/>
+            <path d="M2 6h12M6 2v4M10 2v4"/>
+          </svg>
+          <select class="date-select" id="dateRangeSelect" onchange="updateDateBadge()">
+            <option value="30">Last 30 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M2 3.5L5 6.5L8 3.5"/>
+          </svg>
+        </div>
+        <span class="date-badge" id="dateBadge"></span>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="hero-stats-row">
+      <div class="hstat">
+        <div class="hstat-label"><span class="live-dot"></span>Live visitors</div>
+        <div class="hstat-val" id="hLive">—</div>
+      </div>
+      <div class="hstat-sep"></div>
+      <div class="hstat">
+        <div class="hstat-label">Unique visitors</div>
+        <div class="hstat-val" id="hUnique">—</div>
+      </div>
+      <div class="hstat-sep"></div>
+      <div class="hstat">
+        <div class="hstat-label">Total pageviews</div>
+        <div class="hstat-val" id="hPageviews">—</div>
+      </div>
+      <div class="hstat-sep"></div>
+      <div class="hstat">
+        <div class="hstat-label">npm downloads</div>
+        <div class="hstat-val" id="hDownloads">—</div>
+      </div>
+      <div class="hstat-sep"></div>
+      <div class="hstat">
+        <div class="hstat-label">Countries</div>
+        <div class="hstat-val" id="hCountries">—</div>
+      </div>
+    </div>
+
+    <!-- Dual-line area chart -->
+    <div class="hero-chart-wrap">
+      <div class="hero-chart-top">
+        <div class="hero-chart-legend">
+          <span class="legend-item">
+            <span class="legend-dot" style="background:#a855f7"></span>Downloads
+          </span>
+          <span class="legend-item">
+            <span class="legend-dot" style="background:#22d3ee"></span>Visitors
+          </span>
+        </div>
+        <span style="font-size:11px;color:rgba(235,235,245,0.25)" id="heroChartTotal">—</span>
+      </div>
+      <canvas id="analyticsChart"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Main content ── -->
 <div class="container">
 
-  <!-- Error -->
   <div class="error-banner" id="errorBanner"></div>
 
-  <!-- KPI cards -->
-  <div class="section-title">Overview</div>
+  <!-- npm download KPIs -->
+  <div class="section-title" style="margin-top:4px">npm downloads</div>
   <div class="stats-grid">
     <div class="stat-card" style="--card-glow: linear-gradient(135deg,#a855f7,#ec4899)">
-      <div class="stat-label">All-time downloads</div>
+      <div class="stat-label">All-time</div>
       <div class="stat-value" id="dlTotal"><span class="skeleton skel-num"></span></div>
       <div class="stat-sub" id="dlTotalSub"><span class="skeleton skel-sub"></span></div>
     </div>
@@ -363,21 +514,9 @@
     </div>
   </div>
 
-  <!-- Downloads chart -->
-  <div class="chart-card">
-    <div class="chart-header">
-      <div class="chart-title">Daily downloads — last 30 days</div>
-      <div class="chart-total" id="chartTotal">—</div>
-    </div>
-    <div class="chart-wrap">
-      <canvas id="downloadChart"></canvas>
-    </div>
-  </div>
-
   <!-- ── Visitor Analytics ── -->
-  <div class="section-title" style="margin-top:8px">Visitor analytics</div>
+  <div class="section-title">Visitor analytics</div>
 
-  <!-- Visitor KPIs -->
   <div class="visitor-stats" id="visitorKpis">
     <div class="stat-card">
       <div class="stat-label">Total visitors</div>
@@ -393,21 +532,13 @@
     </div>
   </div>
 
-  <!-- Visitors + Countries side by side -->
   <div class="two-col" style="margin-bottom:28px">
-
-    <!-- Recent visitors -->
     <div>
       <div class="section-title">Recent visitors</div>
       <div class="table-card">
         <table>
           <thead>
-            <tr>
-              <th>Location</th>
-              <th>Device / OS</th>
-              <th>Browser</th>
-              <th>When</th>
-            </tr>
+            <tr><th>Location</th><th>Device / OS</th><th>Browser</th><th>When</th></tr>
           </thead>
           <tbody id="visitorsBody">
             <tr><td colspan="4"><span class="skeleton" style="height:12px;width:90%;display:block;margin:6px 0"></span></td></tr>
@@ -415,8 +546,6 @@
         </table>
       </div>
     </div>
-
-    <!-- Top countries -->
     <div>
       <div class="section-title">Top countries</div>
       <div class="table-card">
@@ -430,23 +559,15 @@
         </table>
       </div>
     </div>
-
   </div>
 
-  <!-- Bottom two columns -->
   <div class="two-col">
-
-    <!-- Version history -->
     <div>
       <div class="section-title">Version history</div>
       <div class="table-card">
         <table id="versionTable">
           <thead>
-            <tr>
-              <th>Version</th>
-              <th>Published</th>
-              <th>Tag</th>
-            </tr>
+            <tr><th>Version</th><th>Published</th><th>Tag</th></tr>
           </thead>
           <tbody id="versionBody">
             <tr><td colspan="3"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
@@ -454,18 +575,12 @@
         </table>
       </div>
     </div>
-
-    <!-- Recent daily breakdown -->
     <div>
       <div class="section-title">Recent daily activity</div>
       <div class="table-card">
         <table>
           <thead>
-            <tr>
-              <th>Date</th>
-              <th>Downloads</th>
-              <th style="width:100px"></th>
-            </tr>
+            <tr><th>Date</th><th>Downloads</th><th style="width:100px"></th></tr>
           </thead>
           <tbody id="dailyBody">
             <tr><td colspan="3"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
@@ -473,7 +588,6 @@
         </table>
       </div>
     </div>
-
   </div>
 
 </div><!-- /container -->
@@ -498,30 +612,169 @@ function relDate(iso) {
   if (diff < 30) return `${Math.floor(diff/7)}w ago`;
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
 }
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60)    return `${s}s ago`;
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
 
-let chartInstance = null;
+// Global state
+let _visitorData = null;
+let _dlRangeData = null;
+let _dlMonthData = null;
 
-// ── Visitor helpers ───────────────────────────────────────────────────────────
 const BROWSER_COLORS = { Chrome:'#4285f4', Firefox:'#ff7139', Safari:'#006cff', Edge:'#0078d4', Opera:'#ff1b2d', Other:'#888' };
 const DEVICE_ICON = { Desktop:'🖥', Mobile:'📱', Tablet:'📟' };
 const FLAG_URL = cc => `https://flagcdn.com/16x12/${cc.toLowerCase()}.png`;
 
-function timeAgo(iso) {
-  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (s < 60)   return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s/60)}m ago`;
-  if (s < 86400)return `${Math.floor(s/3600)}h ago`;
-  return `${Math.floor(s/86400)}d ago`;
+// ── Date badge ────────────────────────────────────────────────────────────────
+function updateDateBadge() {
+  const days = parseInt(document.getElementById('dateRangeSelect').value);
+  const end  = new Date();
+  const start = new Date(end.getTime() - days * 86400000);
+  const fmtD = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  document.getElementById('dateBadge').textContent = `${fmtD(start)} — ${fmtD(end)}`;
 }
 
+// ── Hero stats ────────────────────────────────────────────────────────────────
+function renderHeroStats() {
+  const visitors  = _visitorData?.visitors || [];
+  const countries = _visitorData?.countries || [];
+
+  // Live: last 5 min
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+  const live = visitors.filter(v => new Date(v.ts).getTime() > fiveMinAgo).length;
+
+  // Unique IPs
+  const uniqueIPs = new Set(visitors.map(v => v.ip)).size;
+
+  document.getElementById('hLive').textContent = live;
+  document.getElementById('hUnique').textContent = fmtFull(uniqueIPs);
+  document.getElementById('hPageviews').textContent = fmtFull(visitors.length);
+  document.getElementById('hCountries').textContent = countries.length;
+
+  if (_dlMonthData !== null) {
+    document.getElementById('hDownloads').textContent = fmtFull(_dlMonthData.downloads ?? 0);
+  }
+}
+
+// ── Dual-line area chart ──────────────────────────────────────────────────────
+function renderAnalyticsChart() {
+  const dlDays  = _dlRangeData?.downloads ?? [];
+  const visitors = _visitorData?.visitors ?? [];
+
+  const canvas = document.getElementById('analyticsChart');
+  const ctx    = canvas.getContext('2d');
+
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width * dpr;
+  canvas.height = 220 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = 220;
+  const padL = 36, padR = 16, padT = 16, padB = 30;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const n = dlDays.length;
+
+  if (n === 0) return;
+
+  // Compute daily visitor counts aligned to dlDays date strings
+  const visitorByDay = {};
+  visitors.forEach(v => {
+    const date = new Date(v.ts).toISOString().slice(0, 10);
+    visitorByDay[date] = (visitorByDay[date] || 0) + 1;
+  });
+
+  const dlValues  = dlDays.map(d => d.downloads);
+  const visValues = dlDays.map(d => visitorByDay[d.day] || 0);
+
+  const maxVal = Math.max(...dlValues, ...visValues, 1);
+
+  const total = dlValues.reduce((a, b) => a + b, 0);
+  document.getElementById('heroChartTotal').textContent = fmtFull(total) + ' total downloads';
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    const y = padT + chartH * (1 - t);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    if (t > 0) {
+      ctx.fillStyle = 'rgba(235,235,245,0.2)';
+      ctx.font = '9px -apple-system,system-ui,sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(fmt(Math.round(maxVal * t)), padL - 4, y + 3);
+    }
+  });
+
+  const xOf = i => padL + (i / (n - 1)) * chartW;
+  const yOf = v => padT + chartH * (1 - v / maxVal);
+
+  function drawSeries(values, lineColor, gradTop, gradBot) {
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    grad.addColorStop(0, gradTop);
+    grad.addColorStop(1, gradBot);
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(values[0]));
+    for (let i = 1; i < n; i++) {
+      const cx = (xOf(i-1) + xOf(i)) / 2;
+      ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
+    }
+    ctx.lineTo(xOf(n-1), padT + chartH);
+    ctx.lineTo(xOf(0),   padT + chartH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line stroke
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(values[0]));
+    for (let i = 1; i < n; i++) {
+      const cx = (xOf(i-1) + xOf(i)) / 2;
+      ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
+    }
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Draw visitors (cyan) first — behind
+  drawSeries(visValues, 'rgba(34,211,238,0.85)', 'rgba(34,211,238,0.22)', 'rgba(34,211,238,0)');
+  // Draw downloads (purple) on top
+  drawSeries(dlValues,  'rgba(168,85,247,0.9)',  'rgba(168,85,247,0.28)', 'rgba(168,85,247,0)');
+
+  // X-axis labels
+  const labels = dlDays.map(d => {
+    const [, m, day] = d.day.split('-');
+    return `${parseInt(m)}/${parseInt(day)}`;
+  });
+  ctx.fillStyle = 'rgba(235,235,245,0.22)';
+  ctx.font = '9px -apple-system,system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  labels.forEach((l, i) => {
+    if (i % 5 === 0 || i === n - 1) ctx.fillText(l, xOf(i), H - 8);
+  });
+}
+
+// ── Visitor data ──────────────────────────────────────────────────────────────
 async function loadVisitors() {
   try {
     const res  = await fetch('/api/visitors');
     if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    renderVisitorKPIs(data);
-    renderVisitorsTable(data.visitors || []);
-    renderCountriesTable(data.countries || []);
+    _visitorData = await res.json();
+    renderVisitorKPIs(_visitorData);
+    renderVisitorsTable(_visitorData.visitors || []);
+    renderCountriesTable(_visitorData.countries || []);
+    renderHeroStats();
+    renderAnalyticsChart();
   } catch (e) {
     document.getElementById('visitorsBody').innerHTML =
       `<tr><td colspan="4" style="color:rgba(239,68,68,0.7);font-size:12px;padding:16px 18px">
@@ -537,13 +790,11 @@ function renderVisitorKPIs(data) {
   document.getElementById('vTotal').textContent = fmtFull(visitors.length);
   document.getElementById('vCountries').textContent = (data.countries || []).length;
 
-  // Top device
   const deviceCount = {};
-  visitors.forEach(v => { deviceCount[v.device] = (deviceCount[v.device]||0)+1; });
-  const topDevice = Object.entries(deviceCount).sort((a,b)=>b[1]-a[1])[0];
+  visitors.forEach(v => { deviceCount[v.device] = (deviceCount[v.device] || 0) + 1; });
+  const topDevice = Object.entries(deviceCount).sort((a, b) => b[1] - a[1])[0];
   document.getElementById('vTopDevice').textContent = topDevice
-    ? `${DEVICE_ICON[topDevice[0]] || '?'} ${topDevice[0]}`
-    : '—';
+    ? `${DEVICE_ICON[topDevice[0]] || '?'} ${topDevice[0]}` : '—';
 }
 
 function renderVisitorsTable(visitors) {
@@ -554,16 +805,13 @@ function renderVisitorsTable(visitors) {
   }
   tbody.innerHTML = visitors.slice(0, 50).map(v => {
     const flag = v.countryCode
-      ? `<img src="${FLAG_URL(v.countryCode)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:5px">`
-      : '';
+      ? `<img src="${FLAG_URL(v.countryCode)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:5px">` : '';
     const loc = [v.city, v.country].filter(Boolean).join(', ') || v.ip;
     const browserColor = BROWSER_COLORS[v.browser] || '#888';
     return `<tr>
       <td>${flag}<span style="font-size:12px">${loc}</span></td>
-      <td><span style="font-size:13px;margin-right:4px">${DEVICE_ICON[v.device]||'?'}</span>${v.os}</td>
-      <td>
-        <span class="browser-dot" style="background:${browserColor}"></span>${v.browser}
-      </td>
+      <td><span style="font-size:13px;margin-right:4px">${DEVICE_ICON[v.device] || '?'}</span>${v.os}</td>
+      <td><span class="browser-dot" style="background:${browserColor}"></span>${v.browser}</td>
       <td style="color:rgba(235,235,245,0.35);white-space:nowrap">${timeAgo(v.ts)}</td>
     </tr>`;
   }).join('');
@@ -579,8 +827,7 @@ function renderCountriesTable(countries) {
   tbody.innerHTML = countries.map(c => {
     const pct = Math.round((c.count / maxCount) * 90);
     const flag = c.code
-      ? `<img src="${FLAG_URL(c.code)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:6px">`
-      : '';
+      ? `<img src="${FLAG_URL(c.code)}" width="16" height="12" style="border-radius:2px;vertical-align:middle;margin-right:6px">` : '';
     return `<tr>
       <td>${flag}${c.name}</td>
       <td style="color:rgba(235,235,245,0.85);font-weight:600">${fmtFull(c.count)}</td>
@@ -589,30 +836,41 @@ function renderCountriesTable(countries) {
   }).join('');
 }
 
+// ── Main load ─────────────────────────────────────────────────────────────────
 async function loadAll() {
   const btn = document.getElementById('refreshBtn');
   btn.classList.add('spinning');
+  updateDateBadge();
 
   try {
     const [dlDay, dlWeek, dlMonth, dlRange, registry] = await Promise.all([
-      fetch(`${NPM_DL}/point/last-day/${PKG}`).then(r=>r.json()),
-      fetch(`${NPM_DL}/point/last-week/${PKG}`).then(r=>r.json()),
-      fetch(`${NPM_DL}/point/last-month/${PKG}`).then(r=>r.json()),
-      fetch(`${NPM_DL}/range/last-month/${PKG}`).then(r=>r.json()),
-      fetch(NPM_REG).then(r=>r.json()),
+      fetch(`${NPM_DL}/point/last-day/${PKG}`).then(r => r.json()),
+      fetch(`${NPM_DL}/point/last-week/${PKG}`).then(r => r.json()),
+      fetch(`${NPM_DL}/point/last-month/${PKG}`).then(r => r.json()),
+      fetch(`${NPM_DL}/range/last-month/${PKG}`).then(r => r.json()),
+      fetch(NPM_REG).then(r => r.json()),
     ]);
 
+    _dlRangeData = dlRange;
+    _dlMonthData = dlMonth;
+
     renderKPIs(dlDay, dlWeek, dlMonth);
-    renderChart(dlRange);
     renderVersions(registry);
     renderDaily(dlRange);
+
+    // Hero downloads stat
+    document.getElementById('hDownloads').textContent = fmtFull(dlMonth.downloads ?? 0);
+
+    // Render chart with whatever visitor data we have so far
+    renderAnalyticsChart();
+
     await loadVisitors();
 
     document.getElementById('latestVersion').textContent = 'v' + (registry['dist-tags']?.latest ?? '—');
-    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     document.getElementById('errorBanner').style.display = 'none';
 
-  } catch(err) {
+  } catch (err) {
     const b = document.getElementById('errorBanner');
     b.textContent = '⚠ Failed to load analytics: ' + err.message;
     b.style.display = 'block';
@@ -622,13 +880,12 @@ async function loadAll() {
 }
 
 function renderKPIs(dlDay, dlWeek, dlMonth) {
-  // All-time: npm range API caps at 18 months, use last-year as proxy
   fetch(`${NPM_DL}/point/2020-01-01:${new Date().toISOString().slice(0,10)}/${PKG}`)
-    .then(r=>r.json())
+    .then(r => r.json())
     .then(d => {
       document.getElementById('dlTotal').textContent = fmtFull(d.downloads ?? 0);
-      document.getElementById('dlTotalSub').textContent = `Since launch`;
-    }).catch(()=>{
+      document.getElementById('dlTotalSub').textContent = 'Since launch';
+    }).catch(() => {
       document.getElementById('dlTotal').textContent = fmtFull(dlMonth.downloads ?? 0);
       document.getElementById('dlTotalSub').textContent = 'Last 30 days';
     });
@@ -649,109 +906,11 @@ function renderKPIs(dlDay, dlWeek, dlMonth) {
   document.getElementById('dlDaySub').textContent = dlDay.end ?? '';
 }
 
-function renderChart(dlRange) {
-  const days = dlRange.downloads ?? [];
-  const labels = days.map(d => {
-    const [,m,day] = d.day.split('-');
-    return `${parseInt(m)}/${parseInt(day)}`;
-  });
-  const values = days.map(d => d.downloads);
-  const total = values.reduce((a,b)=>a+b,0);
-  document.getElementById('chartTotal').textContent = fmtFull(total) + ' total';
-
-  const canvas = document.getElementById('downloadChart');
-  const ctx = canvas.getContext('2d');
-
-  // DPR scaling
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = 180 * dpr;
-  ctx.scale(dpr, dpr);
-
-  const W = rect.width, H = 180;
-  const padL = 36, padR = 12, padT = 12, padB = 28;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
-  const maxVal = Math.max(...values, 1);
-  const n = values.length;
-
-  ctx.clearRect(0, 0, W, H);
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
-    const y = padT + chartH * (1 - t);
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-    if (t > 0) {
-      ctx.fillStyle = 'rgba(235,235,245,0.2)';
-      ctx.font = '9px -apple-system,system-ui,sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(fmt(Math.round(maxVal * t)), padL - 4, y + 3);
-    }
-  });
-
-  // Area gradient
-  const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-  grad.addColorStop(0, 'rgba(168,85,247,0.35)');
-  grad.addColorStop(1, 'rgba(168,85,247,0)');
-
-  // Path
-  const xOf = i => padL + (i / (n-1)) * chartW;
-  const yOf = v => padT + chartH * (1 - v / maxVal);
-
-  ctx.beginPath();
-  ctx.moveTo(xOf(0), yOf(values[0]));
-  for (let i = 1; i < n; i++) {
-    const cx = (xOf(i-1) + xOf(i)) / 2;
-    ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
-  }
-  // Fill area
-  ctx.lineTo(xOf(n-1), padT + chartH);
-  ctx.lineTo(xOf(0), padT + chartH);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Line stroke
-  ctx.beginPath();
-  ctx.moveTo(xOf(0), yOf(values[0]));
-  for (let i = 1; i < n; i++) {
-    const cx = (xOf(i-1) + xOf(i)) / 2;
-    ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
-  }
-  ctx.strokeStyle = 'rgba(168,85,247,0.9)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Dots on non-zero days
-  values.forEach((v, i) => {
-    if (v === 0) return;
-    ctx.beginPath();
-    ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#a855f7';
-    ctx.fill();
-  });
-
-  // X labels (every 5 days)
-  ctx.fillStyle = 'rgba(235,235,245,0.25)';
-  ctx.font = '9px -apple-system,system-ui,sans-serif';
-  ctx.textAlign = 'center';
-  labels.forEach((l, i) => {
-    if (i % 5 === 0 || i === n-1) {
-      ctx.fillText(l, xOf(i), H - 6);
-    }
-  });
-}
-
 function renderVersions(registry) {
   const versions = Object.keys(registry.versions ?? {}).reverse();
-  const times = registry.time ?? {};
+  const times  = registry.time ?? {};
   const latest = registry['dist-tags']?.latest;
-
-  const tbody = document.getElementById('versionBody');
-  tbody.innerHTML = versions.slice(0, 20).map(v => `
+  document.getElementById('versionBody').innerHTML = versions.slice(0, 20).map(v => `
     <tr>
       <td><code style="font-size:12px;color:rgba(235,235,245,0.8)">${v}</code></td>
       <td>${relDate(times[v] ?? '')}</td>
@@ -762,32 +921,69 @@ function renderVersions(registry) {
 
 function renderDaily(dlRange) {
   const days = [...(dlRange.downloads ?? [])].reverse().slice(0, 14);
-  const maxVal = Math.max(...days.map(d=>d.downloads), 1);
-
-  const tbody = document.getElementById('dailyBody');
-  tbody.innerHTML = days.map(d => {
+  const maxVal = Math.max(...days.map(d => d.downloads), 1);
+  document.getElementById('dailyBody').innerHTML = days.map(d => {
     const pct = Math.round((d.downloads / maxVal) * 100);
     return `
     <tr>
       <td>${relDate(d.day)}</td>
       <td style="color:rgba(235,235,245,0.85);font-weight:${d.downloads > 0 ? 600 : 400}">${fmtFull(d.downloads)}</td>
-      <td>
-        <div class="bar-cell">
-          <div class="mini-bar" style="width:${pct}px;max-width:80px"></div>
-        </div>
-      </td>
+      <td><div class="bar-cell"><div class="mini-bar" style="width:${pct}px;max-width:80px"></div></div></td>
     </tr>`;
   }).join('');
 }
 
+// ── Reset analytics data ──────────────────────────────────────────────────────
+async function resetAnalytics() {
+  if (!confirm('Reset all visitor analytics data? This cannot be undone.')) return;
+
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true;
+  btn.textContent = 'Resetting…';
+
+  try {
+    const res = await fetch('/api/reset-visitors', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+
+    // Clear local state
+    _visitorData = null;
+
+    // Reset hero stats
+    ['hLive','hUnique','hPageviews','hCountries'].forEach(id => {
+      document.getElementById(id).textContent = '0';
+    });
+    document.getElementById('heroChartTotal').textContent = '—';
+
+    // Clear visitor tables
+    document.getElementById('visitorsBody').innerHTML =
+      `<tr><td colspan="4" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No visitors yet</td></tr>`;
+    document.getElementById('countriesBody').innerHTML =
+      `<tr><td colspan="3" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No data yet</td></tr>`;
+
+    // Clear visitor KPIs
+    document.getElementById('vTotal').textContent = '0';
+    document.getElementById('vCountries').textContent = '0';
+    document.getElementById('vTopDevice').textContent = '—';
+
+    // Redraw chart (no visitor line now)
+    renderAnalyticsChart();
+
+    btn.textContent = 'Done ✓';
+    setTimeout(() => { btn.textContent = 'Reset data'; btn.disabled = false; }, 2000);
+  } catch (err) {
+    alert('Reset failed: ' + err.message);
+    btn.textContent = 'Reset data';
+    btn.disabled = false;
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const SESSION_KEY = 'optate_admin_auth';
-// SHA-256 of "admin@optate.dev:Optate@2026"
 const VALID_HASH  = '685cd5890bca3fb73a20b9871ca58dd233f0df507e085b6ae2aa2396ec826104';
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function showDashboard() {
@@ -835,7 +1031,7 @@ function handleLogout() {
   document.getElementById('appShell').style.display = 'none';
   document.getElementById('loginOverlay').style.cssText = 'display:flex;animation:none';
   document.getElementById('loginEmail').value = '';
-  document.getElementById('loginPass').value = '';
+  document.getElementById('loginPass').value  = '';
   document.getElementById('loginError').style.display = 'none';
 }
 
