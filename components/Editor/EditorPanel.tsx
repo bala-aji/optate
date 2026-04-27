@@ -1947,7 +1947,7 @@ export const EditorPanel: React.FC = () => {
     flexDirection: 'column',
     fontFamily: T.font,
     overflow: 'hidden',
-    transform: mounted ? 'translateX(0)' : `translateX(${panelSide === 'right' ? '120%' : '-120%'})`,
+    transform: mounted ? 'none' : `translateX(${panelSide === 'right' ? '120%' : '-120%'})`,
     transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
   };
 
