@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optate Admin · Analytics</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0b;
+      color: rgba(235,235,245,0.86);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(14,14,16,0.9);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(20px);
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-brand img { height: 18px; }
+    .topbar-badge {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: rgba(168,85,247,0.9);
+      background: rgba(168,85,247,0.12);
+      border: 1px solid rgba(168,85,247,0.2);
+      padding: 2px 8px; border-radius: 20px;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .version-badge {
+      font-size: 11px; font-weight: 500;
+      color: rgba(52,211,153,0.85);
+      background: rgba(52,211,153,0.08);
+      border: 1px solid rgba(52,211,153,0.18);
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .last-updated {
+      font-size: 11px; color: rgba(235,235,245,0.28);
+    }
+    .refresh-btn {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 500;
+      color: rgba(235,235,245,0.55);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 5px 12px; border-radius: 8px;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.09); color: rgba(235,235,245,0.85); }
+    .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ── Section header ── */
+    .section-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
+      text-transform: uppercase; color: rgba(235,235,245,0.3);
+      margin-bottom: 14px;
+    }
+
+    /* ── Stat cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+
+    .stat-card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--card-glow, transparent);
+      opacity: 0.04;
+      pointer-events: none;
+    }
+    .stat-label {
+      font-size: 11px; color: rgba(235,235,245,0.38);
+      letter-spacing: 0.02em; margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 28px; font-weight: 700; letter-spacing: -0.03em;
+      color: rgba(235,235,245,0.92); line-height: 1;
+    }
+    .stat-sub {
+      font-size: 11px; color: rgba(235,235,245,0.28);
+      margin-top: 6px;
+    }
+    .stat-trend {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 7px; border-radius: 6px;
+      margin-top: 6px;
+    }
+    .trend-up { color: #34d399; background: rgba(52,211,153,0.1); }
+    .trend-neutral { color: rgba(235,235,245,0.35); background: rgba(255,255,255,0.05); }
+
+    /* ── Chart card ── */
+    .chart-card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 20px 22px;
+      margin-bottom: 28px;
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .chart-title { font-size: 13px; font-weight: 600; color: rgba(235,235,245,0.8); }
+    .chart-total {
+      font-size: 13px; font-weight: 600;
+      color: rgba(168,85,247,0.85);
+    }
+    .chart-wrap { position: relative; height: 180px; }
+    canvas#downloadChart { width: 100% !important; height: 180px !important; }
+
+    /* ── Two col ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Table card ── */
+    .table-card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+    .table-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 13px; font-weight: 600; color: rgba(235,235,245,0.8);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+      text-transform: uppercase; color: rgba(235,235,245,0.28);
+      padding: 10px 18px; text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    td {
+      padding: 10px 18px; font-size: 12px;
+      color: rgba(235,235,245,0.65);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.025); }
+    .tag {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      padding: 2px 7px; border-radius: 5px;
+      background: rgba(52,211,153,0.1); color: rgba(52,211,153,0.85);
+    }
+    .tag.latest {
+      background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.85);
+    }
+
+    /* ── Skeleton loader ── */
+    .skeleton {
+      background: linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skel-num { height: 28px; width: 80px; }
+    .skel-sub { height: 11px; width: 60px; margin-top: 7px; }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 12px; color: rgba(239,68,68,0.8);
+      margin-bottom: 20px; display: none;
+    }
+
+    /* ── Mini bar chart inside table ── */
+    .bar-cell { display: flex; align-items: center; gap: 8px; }
+    .mini-bar {
+      height: 4px; border-radius: 2px;
+      background: rgba(168,85,247,0.5);
+      transition: width 0.5s ease;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="/logo.png" alt="Optate" />
+    <span class="topbar-badge">Admin</span>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge" id="latestVersion">v—</span>
+    <span class="last-updated" id="lastUpdated">—</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/>
+        <path d="M13.5 2v3.5H10"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Error -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- KPI cards -->
+  <div class="section-title">Overview</div>
+  <div class="stats-grid">
+    <div class="stat-card" style="--card-glow: linear-gradient(135deg,#a855f7,#ec4899)">
+      <div class="stat-label">All-time downloads</div>
+      <div class="stat-value" id="dlTotal"><span class="skeleton skel-num"></span></div>
+      <div class="stat-sub" id="dlTotalSub"><span class="skeleton skel-sub"></span></div>
+    </div>
+    <div class="stat-card" style="--card-glow: linear-gradient(135deg,#3b82f6,#06b6d4)">
+      <div class="stat-label">Last 30 days</div>
+      <div class="stat-value" id="dlMonth"><span class="skeleton skel-num"></span></div>
+      <div id="dlMonthTrend"></div>
+    </div>
+    <div class="stat-card" style="--card-glow: linear-gradient(135deg,#10b981,#06b6d4)">
+      <div class="stat-label">Last 7 days</div>
+      <div class="stat-value" id="dlWeek"><span class="skeleton skel-num"></span></div>
+      <div id="dlWeekTrend"></div>
+    </div>
+    <div class="stat-card" style="--card-glow: linear-gradient(135deg,#f59e0b,#f97316)">
+      <div class="stat-label">Yesterday</div>
+      <div class="stat-value" id="dlDay"><span class="skeleton skel-num"></span></div>
+      <div class="stat-sub" id="dlDaySub"><span class="skeleton skel-sub"></span></div>
+    </div>
+  </div>
+
+  <!-- Downloads chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Daily downloads — last 30 days</div>
+      <div class="chart-total" id="chartTotal">—</div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="downloadChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom two columns -->
+  <div class="two-col">
+
+    <!-- Version history -->
+    <div>
+      <div class="section-title">Version history</div>
+      <div class="table-card">
+        <table id="versionTable">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Published</th>
+              <th>Tag</th>
+            </tr>
+          </thead>
+          <tbody id="versionBody">
+            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent daily breakdown -->
+    <div>
+      <div class="section-title">Recent daily activity</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Downloads</th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
+          <tbody id="dailyBody">
+            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /container -->
+
+<script>
+const PKG = '@optate/plugin';
+const NPM_DL  = 'https://api.npmjs.org/downloads';
+const NPM_REG = `https://registry.npmjs.org/${encodeURIComponent(PKG)}`;
+
+function fmt(n) {
+  if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'k';
+  return String(n);
+}
+function fmtFull(n) { return n.toLocaleString(); }
+function relDate(iso) {
+  const d = new Date(iso), now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff < 7)  return `${diff}d ago`;
+  if (diff < 30) return `${Math.floor(diff/7)}w ago`;
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
+let chartInstance = null;
+
+async function loadAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+
+  try {
+    const [dlDay, dlWeek, dlMonth, dlRange, registry] = await Promise.all([
+      fetch(`${NPM_DL}/point/last-day/${PKG}`).then(r=>r.json()),
+      fetch(`${NPM_DL}/point/last-week/${PKG}`).then(r=>r.json()),
+      fetch(`${NPM_DL}/point/last-month/${PKG}`).then(r=>r.json()),
+      fetch(`${NPM_DL}/range/last-month/${PKG}`).then(r=>r.json()),
+      fetch(NPM_REG).then(r=>r.json()),
+    ]);
+
+    renderKPIs(dlDay, dlWeek, dlMonth);
+    renderChart(dlRange);
+    renderVersions(registry);
+    renderDaily(dlRange);
+
+    document.getElementById('latestVersion').textContent = 'v' + (registry['dist-tags']?.latest ?? '—');
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    document.getElementById('errorBanner').style.display = 'none';
+
+  } catch(err) {
+    const b = document.getElementById('errorBanner');
+    b.textContent = '⚠ Failed to load analytics: ' + err.message;
+    b.style.display = 'block';
+  }
+
+  btn.classList.remove('spinning');
+}
+
+function renderKPIs(dlDay, dlWeek, dlMonth) {
+  // All-time: npm range API caps at 18 months, use last-year as proxy
+  fetch(`${NPM_DL}/point/2020-01-01:${new Date().toISOString().slice(0,10)}/${PKG}`)
+    .then(r=>r.json())
+    .then(d => {
+      document.getElementById('dlTotal').textContent = fmtFull(d.downloads ?? 0);
+      document.getElementById('dlTotalSub').textContent = `Since launch`;
+    }).catch(()=>{
+      document.getElementById('dlTotal').textContent = fmtFull(dlMonth.downloads ?? 0);
+      document.getElementById('dlTotalSub').textContent = 'Last 30 days';
+    });
+
+  document.getElementById('dlMonth').textContent = fmtFull(dlMonth.downloads ?? 0);
+  document.getElementById('dlMonthTrend').innerHTML =
+    `<span class="stat-trend ${dlMonth.downloads > 0 ? 'trend-up' : 'trend-neutral'}">
+      ${dlMonth.downloads > 0 ? '↑' : '—'} ${dlMonth.start} → ${dlMonth.end}
+    </span>`;
+
+  document.getElementById('dlWeek').textContent = fmtFull(dlWeek.downloads ?? 0);
+  document.getElementById('dlWeekTrend').innerHTML =
+    `<span class="stat-trend ${dlWeek.downloads > 0 ? 'trend-up' : 'trend-neutral'}">
+      ${dlWeek.downloads > 0 ? '↑' : '—'} past 7 days
+    </span>`;
+
+  document.getElementById('dlDay').textContent = fmtFull(dlDay.downloads ?? 0);
+  document.getElementById('dlDaySub').textContent = dlDay.end ?? '';
+}
+
+function renderChart(dlRange) {
+  const days = dlRange.downloads ?? [];
+  const labels = days.map(d => {
+    const [,m,day] = d.day.split('-');
+    return `${parseInt(m)}/${parseInt(day)}`;
+  });
+  const values = days.map(d => d.downloads);
+  const total = values.reduce((a,b)=>a+b,0);
+  document.getElementById('chartTotal').textContent = fmtFull(total) + ' total';
+
+  const canvas = document.getElementById('downloadChart');
+  const ctx = canvas.getContext('2d');
+
+  // DPR scaling
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = 180;
+  const padL = 36, padR = 12, padT = 12, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const maxVal = Math.max(...values, 1);
+  const n = values.length;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    const y = padT + chartH * (1 - t);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    if (t > 0) {
+      ctx.fillStyle = 'rgba(235,235,245,0.2)';
+      ctx.font = '9px -apple-system,system-ui,sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(fmt(Math.round(maxVal * t)), padL - 4, y + 3);
+    }
+  });
+
+  // Area gradient
+  const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+  grad.addColorStop(0, 'rgba(168,85,247,0.35)');
+  grad.addColorStop(1, 'rgba(168,85,247,0)');
+
+  // Path
+  const xOf = i => padL + (i / (n-1)) * chartW;
+  const yOf = v => padT + chartH * (1 - v / maxVal);
+
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(values[0]));
+  for (let i = 1; i < n; i++) {
+    const cx = (xOf(i-1) + xOf(i)) / 2;
+    ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
+  }
+  // Fill area
+  ctx.lineTo(xOf(n-1), padT + chartH);
+  ctx.lineTo(xOf(0), padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line stroke
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(values[0]));
+  for (let i = 1; i < n; i++) {
+    const cx = (xOf(i-1) + xOf(i)) / 2;
+    ctx.bezierCurveTo(cx, yOf(values[i-1]), cx, yOf(values[i]), xOf(i), yOf(values[i]));
+  }
+  ctx.strokeStyle = 'rgba(168,85,247,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Dots on non-zero days
+  values.forEach((v, i) => {
+    if (v === 0) return;
+    ctx.beginPath();
+    ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#a855f7';
+    ctx.fill();
+  });
+
+  // X labels (every 5 days)
+  ctx.fillStyle = 'rgba(235,235,245,0.25)';
+  ctx.font = '9px -apple-system,system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  labels.forEach((l, i) => {
+    if (i % 5 === 0 || i === n-1) {
+      ctx.fillText(l, xOf(i), H - 6);
+    }
+  });
+}
+
+function renderVersions(registry) {
+  const versions = Object.keys(registry.versions ?? {}).reverse();
+  const times = registry.time ?? {};
+  const latest = registry['dist-tags']?.latest;
+
+  const tbody = document.getElementById('versionBody');
+  tbody.innerHTML = versions.slice(0, 20).map(v => `
+    <tr>
+      <td><code style="font-size:12px;color:rgba(235,235,245,0.8)">${v}</code></td>
+      <td>${relDate(times[v] ?? '')}</td>
+      <td>${v === latest ? '<span class="tag latest">latest</span>' : ''}</td>
+    </tr>
+  `).join('');
+}
+
+function renderDaily(dlRange) {
+  const days = [...(dlRange.downloads ?? [])].reverse().slice(0, 14);
+  const maxVal = Math.max(...days.map(d=>d.downloads), 1);
+
+  const tbody = document.getElementById('dailyBody');
+  tbody.innerHTML = days.map(d => {
+    const pct = Math.round((d.downloads / maxVal) * 100);
+    return `
+    <tr>
+      <td>${relDate(d.day)}</td>
+      <td style="color:rgba(235,235,245,0.85);font-weight:${d.downloads > 0 ? 600 : 400}">${fmtFull(d.downloads)}</td>
+      <td>
+        <div class="bar-cell">
+          <div class="mini-bar" style="width:${pct}px;max-width:80px"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Init
+loadAll();
+</script>
+</body>
+</html>
