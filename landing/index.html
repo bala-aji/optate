@@ -756,7 +756,13 @@
         Inspect elements, tweak styles, export clean CSS — then paste into your AI chat to apply changes in seconds.
       </p>
       <div class="hero-actions">
-        <a href="#install" class="btn-primary">Get Started →</a>
+        <button class="btn-primary" id="tryDemoBtn" onclick="launchDemo()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 5.5L10.5 8L6.5 10.5V5.5Z" fill="currentColor"/>
+          </svg>
+          Try Live Demo
+        </button>
         <a href="https://github.com/your-username/optate" target="_blank" rel="noopener" class="btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path
@@ -1049,6 +1055,32 @@
         window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
       });
     });
+  </script>
+
+  <!-- Live demo launcher -->
+  <script>
+    function launchDemo() {
+      const btn = document.getElementById('tryDemoBtn');
+      if (btn.dataset.loaded) return;
+
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
+
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@optate/plugin@latest/dist/client.js';
+      script.onload = function () {
+        btn.dataset.loaded = 'true';
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M3 8.5L6.5 12L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Demo Active`;
+        btn.style.background = 'linear-gradient(135deg,#34d399,#059669)';
+        btn.style.boxShadow = '0 4px 24px rgba(52,211,153,0.35)';
+        btn.disabled = false;
+      };
+      script.onerror = function () {
+        btn.textContent = 'Try Live Demo';
+        btn.disabled = false;
+      };
+      document.head.appendChild(script);
+    }
   </script>
 
   <!-- Optate visitor tracking beacon -->
