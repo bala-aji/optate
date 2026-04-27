@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createPortal } from 'react';
 import { useSelection } from '@/lib/selection-context';
 import { applyStyle, getComputedStyleValue, rgbToHex } from '@/lib/css-utils';
 import { changeTracker } from '@/lib/change-tracker';
@@ -9,7 +9,7 @@ import {
   ChevronDown, X, Trash2, ArrowLeftRight, RotateCcw,
   Link, Eye, EyeOff, Upload, Image, Crosshair,
   MoveHorizontal, MoveVertical, Repeat2, Paperclip,
-  LayoutGrid, Minus, Droplet, Network,
+  LayoutGrid, Minus, Droplet, Network, Plus,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -799,6 +799,153 @@ const GradientEditor: React.FC<{ value: string; onChange: (css: string) => void 
   );
 };
 
+// ─── Effect Popover ───────────────────────────────────────────────────────────
+
+const EffectPopover: React.FC<{
+  eff: EffectItem;
+  anchorRect: DOMRect;
+  onUpdate: (patch: Partial<EffectItem>) => void;
+  onClose: () => void;
+}> = ({ eff, anchorRect, onUpdate, onClose }) => {
+  const isShadow = eff.type === 'drop-shadow' || eff.type === 'inner-shadow';
+  const isBlur   = eff.type === 'layer-blur'  || eff.type === 'background-blur';
+
+  // Position: to the LEFT of the anchor, vertically centred on it
+  const width  = 280;
+  const gap    = 12;
+  const left   = Math.max(8, anchorRect.left - width - gap);
+  const top    = Math.min(
+    window.innerHeight - 380,
+    Math.max(8, anchorRect.top - 10),
+  );
+
+  const popover = (
+    <div
+      onMouseDown={e => e.stopPropagation()}
+      style={{
+        position: 'fixed', zIndex: 2147483646,
+        left, top, width,
+        background: 'rgba(28,28,30,0.97)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: 14,
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+        padding: '14px 16px 16px',
+        fontFamily: T.font,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+        <div style={{ position:'relative', flex:1 }}>
+          <select value={eff.type} onChange={e => onUpdate({ type: e.target.value as EffectType })} style={{
+            appearance:'none', WebkitAppearance:'none', background:'transparent', border:'none', outline:'none',
+            color: T.valueColor, fontFamily: T.font, fontSize:13, fontWeight:700, cursor:'pointer', padding:'0 20px 0 0',
+          }}>
+            <option value="drop-shadow">Drop shadow</option>
+            <option value="inner-shadow">Inner shadow</option>
+            <option value="layer-blur">Layer blur</option>
+            <option value="background-blur">Background blur</option>
+          </select>
+          <ChevronDown size={10} strokeWidth={2} style={{ position:'absolute', right:2, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color: T.labelColor }} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {isShadow && <Droplet size={14} strokeWidth={1.5} style={{ color: T.labelColor }} />}
+          {isBlur && (
+            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color: T.labelColor }}>
+              <circle cx="8" cy="8" r="5" strokeDasharray="2 2"/><circle cx="8" cy="8" r="2"/>
+            </svg>
+          )}
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color: T.labelColor, padding:2, display:'flex', alignItems:'center' }}>
+            <X size={13} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      {/* Shadow fields */}
+      {isShadow && (
+        <>
+          {/* Position */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+            <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Position</span>
+            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+                <span style={{ fontSize:11, color: T.labelColor, width:10 }}>X</span>
+                <input type="number" value={eff.x} onChange={e => onUpdate({ x: +e.target.value })}
+                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+                <span style={{ fontSize:11, color: T.labelColor, width:10 }}>Y</span>
+                <input type="number" value={eff.y} onChange={e => onUpdate({ y: +e.target.value })}
+                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Blur */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+            <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Blur</span>
+            <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+              <svg width={13} height={13} viewBox="0 0 16 16" fill="none" style={{ color: T.labelColor, flexShrink:0 }}>
+                <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                <circle cx="4" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
+                <circle cx="12" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
+                <circle cx="8" cy="4" r="1.2" fill="currentColor" opacity=".5"/>
+                <circle cx="8" cy="12" r="1.2" fill="currentColor" opacity=".5"/>
+              </svg>
+              <input type="number" min={0} value={eff.blur} onChange={e => onUpdate({ blur: +e.target.value })}
+                style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+            </div>
+          </div>
+
+          {/* Spread */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+            <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Spread</span>
+            <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+              <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ color: T.labelColor, flexShrink:0 }}>
+                <circle cx="8" cy="8" r="3" strokeDasharray="1.5 1.5"/>
+                <circle cx="8" cy="8" r="6" strokeDasharray="1.5 1.5" opacity=".4"/>
+              </svg>
+              <input type="number" value={eff.spread} onChange={e => onUpdate({ spread: +e.target.value })}
+                style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+            </div>
+          </div>
+
+          {/* Color */}
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Color</span>
+            <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+              <div style={{ position:'relative', width:20, height:20, borderRadius:4, background: eff.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
+                <input type="color" value={eff.color} onChange={e => onUpdate({ color: e.target.value })}
+                  style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
+              </div>
+              <input value={eff.color.replace('#','').toUpperCase()}
+                onChange={e => { const raw = e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if (raw.length===6) onUpdate({ color:'#'+raw }); }}
+                style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }} />
+              <input type="number" min={0} max={100} value={eff.colorOpacity} onChange={e => onUpdate({ colorOpacity: Math.max(0,Math.min(100,+e.target.value)) })}
+                style={{ width:32, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font, textAlign:'right' }} />
+              <span style={{ fontSize:10, color: T.labelColor, flexShrink:0 }}>%</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Blur-only field */}
+      {isBlur && (
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:11, color: T.labelColor, width:52, flexShrink:0 }}>Blur</span>
+          <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background: T.inputBg, border: T.inputBorder, borderRadius:7, padding:'5px 10px' }}>
+            <input type="number" min={0} value={eff.blur} onChange={e => onUpdate({ blur: +e.target.value })}
+              style={{ flex:1, background:'transparent', border:'none', outline:'none', color: T.valueColor, fontSize:12, fontFamily: T.font }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return createPortal(popover, document.body) as React.ReactElement;
+};
+
 // ─── Image Upload ─────────────────────────────────────────────────────────────
 
 const UploadModal: React.FC<{
@@ -1235,6 +1382,7 @@ export const EditorPanel: React.FC = () => {
   const [blendMode, setBlendMode] = useState('normal');
   const [effects, setEffects] = useState<EffectItem[]>([]);
   const [expandedEffectId, setExpandedEffectId] = useState<string | null>(null);
+  const [effectAnchorRect, setEffectAnchorRect] = useState<DOMRect | null>(null);
 
   // Transform
   const [rotate, setRotate] = useState('0');
@@ -2587,177 +2735,75 @@ export const EditorPanel: React.FC = () => {
               {effects.map(eff => {
                 const isExpanded = expandedEffectId === eff.id;
                 const isShadow = eff.type==='drop-shadow'||eff.type==='inner-shadow';
-                const isBlur = eff.type==='layer-blur'||eff.type==='background-blur';
-                // Preview color
                 const previewBg = isShadow ? eff.color : T.accent;
-                const EFFECT_LABELS: Record<EffectType,string> = { 'drop-shadow':'Drop shadow', 'inner-shadow':'Inner shadow', 'layer-blur':'Layer blur', 'background-blur':'Background blur' };
                 return (
-                  <div key={eff.id}>
-                    {/* Row */}
-                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      {/* Color/preview square */}
-                      <div onClick={()=>setExpandedEffectId(isExpanded ? null : eff.id)} style={{
+                  <div key={eff.id} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    {/* Preview square — click opens floating popover */}
+                    <div
+                      onClick={e => {
+                        if (isExpanded) { setExpandedEffectId(null); setEffectAnchorRect(null); }
+                        else { setExpandedEffectId(eff.id); setEffectAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect()); }
+                      }}
+                      style={{
                         width:28, height:28, borderRadius:6, flexShrink:0, cursor:'pointer',
-                        background: isShadow ? `rgba(59,130,246,0.15)` : 'rgba(99,102,241,0.15)',
-                        border:'1.5px solid rgba(59,130,246,0.5)',
+                        background: isExpanded ? 'rgba(59,130,246,0.25)' : (isShadow ? 'rgba(59,130,246,0.12)' : 'rgba(99,102,241,0.12)'),
+                        border: isExpanded ? '1.5px solid rgba(59,130,246,0.8)' : '1.5px solid rgba(59,130,246,0.4)',
                         display:'flex', alignItems:'center', justifyContent:'center',
-                      }}>
-                        <div style={{ width:14, height:14, borderRadius:3, background:previewBg, border:'1.5px solid rgba(255,255,255,0.25)', boxShadow: isShadow ? `1px 2px 4px ${eff.color}` : 'none' }} />
-                      </div>
-                      {/* Type dropdown */}
-                      <div style={{ position:'relative', flex:1 }}>
-                        <select value={eff.type} onChange={e=>{ updateEffect(eff.id,{type:e.target.value as EffectType}); }} style={{
-                          width:'100%', appearance:'none', WebkitAppearance:'none',
-                          background:T.inputBg, border:T.inputBorder, borderRadius:7,
-                          color:T.valueColor, fontFamily:T.font, fontSize:11,
-                          padding:'5px 24px 5px 8px', cursor:'pointer', outline:'none',
-                        }}>
-                          <option value="drop-shadow">Drop shadow</option>
-                          <option value="inner-shadow">Inner shadow</option>
-                          <option value="layer-blur">Layer blur</option>
-                          <option value="background-blur">Background blur</option>
-                        </select>
-                        <ChevronDown size={9} strokeWidth={1.8} style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
-                      </div>
-                      {/* Visibility toggle */}
-                      <button onClick={()=>toggleEffect(eff.id)} title={eff.visible?'Hide':'Show'} style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color: eff.visible ? T.valueColor : 'rgba(255,255,255,0.2)', padding:0 }}>
-                        {eff.visible
-                          ? <Eye size={14} strokeWidth={1.5} />
-                          : <EyeOff size={14} strokeWidth={1.5} />
-                        }
-                      </button>
-                      {/* Delete */}
-                      <button onClick={()=>removeEffect(eff.id)} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
-                        <Minus size={12} strokeWidth={1.8} />
-                      </button>
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <div style={{ width:14, height:14, borderRadius:3, background:previewBg, border:'1.5px solid rgba(255,255,255,0.25)', boxShadow: isShadow ? `1px 2px 4px ${eff.color}` : 'none' }} />
                     </div>
-
-                    {/* Expanded editor */}
-                    {isExpanded && (
-                      <div style={{ marginTop:8, padding:'12px 12px 10px', background:'rgba(255,255,255,0.04)', borderRadius:10, border:T.inputBorder }}>
-                        {/* Header row */}
-                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                          <div style={{ position:'relative', flex:1 }}>
-                            <select value={eff.type} onChange={e=>updateEffect(eff.id,{type:e.target.value as EffectType})} style={{
-                              appearance:'none', WebkitAppearance:'none', background:'transparent', border:'none', outline:'none',
-                              color:T.valueColor, fontFamily:T.font, fontSize:12, fontWeight:600, cursor:'pointer', padding:'0 18px 0 0',
-                            }}>
-                              <option value="drop-shadow">Drop shadow</option>
-                              <option value="inner-shadow">Inner shadow</option>
-                              <option value="layer-blur">Layer blur</option>
-                              <option value="background-blur">Background blur</option>
-                            </select>
-                            <ChevronDown size={9} strokeWidth={1.8} style={{ position:'absolute', right:2, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
-                          </div>
-                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            {/* Waterdrop / blur icon */}
-                            {isShadow && (
-                              <Droplet size={14} strokeWidth={1.5} style={{ color: T.labelColor }} />
-                            )}
-                            {isBlur && (
-                              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color:T.labelColor }}>
-                                <circle cx="8" cy="8" r="5" strokeDasharray="2 2"/>
-                                <circle cx="8" cy="8" r="2"/>
-                              </svg>
-                            )}
-                            {/* Close */}
-                            <button onClick={()=>setExpandedEffectId(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.labelColor, padding:2, display:'flex', alignItems:'center' }}>
-                              <X size={12} strokeWidth={2} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Shadow-specific fields */}
-                        {isShadow && (
-                          <>
-                            {/* Position */}
-                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Position</span>
-                              <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
-                                {/* X */}
-                                <div style={{ display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                                  <span style={{ fontSize:10, color:T.labelColor, fontFamily:T.font, width:10 }}>X</span>
-                                  <input type="number" value={eff.x} onChange={e=>updateEffect(eff.id,{x:+e.target.value})}
-                                    style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
-                                </div>
-                                {/* Y */}
-                                <div style={{ display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                                  <span style={{ fontSize:10, color:T.labelColor, fontFamily:T.font, width:10 }}>Y</span>
-                                  <input type="number" value={eff.y} onChange={e=>updateEffect(eff.id,{y:+e.target.value})}
-                                    style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
-                                </div>
-                              </div>
-                            </div>
-                            {/* Blur */}
-                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Blur</span>
-                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                                {/* blur icon */}
-                                <svg width={13} height={13} viewBox="0 0 16 16" fill="none" style={{ color:T.labelColor, flexShrink:0 }}>
-                                  <circle cx="8" cy="8" r="2" fill="currentColor"/>
-                                  <circle cx="4" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
-                                  <circle cx="12" cy="8" r="1.2" fill="currentColor" opacity=".5"/>
-                                  <circle cx="8" cy="4" r="1.2" fill="currentColor" opacity=".5"/>
-                                  <circle cx="8" cy="12" r="1.2" fill="currentColor" opacity=".5"/>
-                                  <circle cx="5.2" cy="5.2" r="0.8" fill="currentColor" opacity=".3"/>
-                                  <circle cx="10.8" cy="10.8" r="0.8" fill="currentColor" opacity=".3"/>
-                                </svg>
-                                <input type="number" min={0} value={eff.blur} onChange={e=>updateEffect(eff.id,{blur:+e.target.value})}
-                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
-                              </div>
-                            </div>
-                            {/* Spread */}
-                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Spread</span>
-                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                                {/* spread icon */}
-                                <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ color:T.labelColor, flexShrink:0 }}>
-                                  <circle cx="8" cy="8" r="3" strokeDasharray="1.5 1.5"/>
-                                  <circle cx="8" cy="8" r="6" strokeDasharray="1.5 1.5" opacity=".4"/>
-                                </svg>
-                                <input type="number" value={eff.spread} onChange={e=>updateEffect(eff.id,{spread:+e.target.value})}
-                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
-                              </div>
-                            </div>
-                            {/* Color row */}
-                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                              <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Color</span>
-                              <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                                {/* Swatch */}
-                                <div style={{ position:'relative', width:18, height:18, borderRadius:3, background:eff.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
-                                  <input type="color" value={eff.color} onChange={e=>updateEffect(eff.id,{color:e.target.value})}
-                                    style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
-                                </div>
-                                {/* Hex */}
-                                <input value={eff.color.replace('#','').toUpperCase()} onChange={e=>{ const raw=e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if(raw.length===6) updateEffect(eff.id,{color:'#'+raw}); }}
-                                  style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }} />
-                                {/* Opacity */}
-                                <input type="number" min={0} max={100} value={eff.colorOpacity} onChange={e=>updateEffect(eff.id,{colorOpacity:Math.max(0,Math.min(100,+e.target.value))})}
-                                  style={{ width:30, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font, textAlign:'right' }} />
-                                <span style={{ fontSize:10, color:T.labelColor }}>%</span>
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        {/* Blur-only fields */}
-                        {isBlur && (
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <span style={{ fontSize:11, color:T.labelColor, fontFamily:T.font, width:56, flexShrink:0 }}>Blur</span>
-                            <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, background:T.inputBg, border:T.inputBorder, borderRadius:6, padding:'4px 8px' }}>
-                              <input type="number" min={0} value={eff.blur} onChange={e=>updateEffect(eff.id,{blur:+e.target.value})}
-                                style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* Type dropdown */}
+                    <div style={{ position:'relative', flex:1 }}>
+                      <select value={eff.type} onChange={e => updateEffect(eff.id,{type:e.target.value as EffectType})} style={{
+                        width:'100%', appearance:'none', WebkitAppearance:'none',
+                        background:T.inputBg, border:T.inputBorder, borderRadius:7,
+                        color:T.valueColor, fontFamily:T.font, fontSize:11,
+                        padding:'5px 24px 5px 8px', cursor:'pointer', outline:'none',
+                      }}>
+                        <option value="drop-shadow">Drop shadow</option>
+                        <option value="inner-shadow">Inner shadow</option>
+                        <option value="layer-blur">Layer blur</option>
+                        <option value="background-blur">Background blur</option>
+                      </select>
+                      <ChevronDown size={9} strokeWidth={1.8} style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
+                    </div>
+                    {/* Visibility */}
+                    <button onClick={()=>toggleEffect(eff.id)} title={eff.visible?'Hide':'Show'} style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color: eff.visible ? T.valueColor : 'rgba(255,255,255,0.2)', padding:0 }}>
+                      {eff.visible ? <Eye size={14} strokeWidth={1.5}/> : <EyeOff size={14} strokeWidth={1.5}/>}
+                    </button>
+                    {/* Delete */}
+                    <button onClick={()=>{ removeEffect(eff.id); if(isExpanded){setExpandedEffectId(null);setEffectAnchorRect(null);} }} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
+                      <Minus size={12} strokeWidth={1.8}/>
+                    </button>
                   </div>
                 );
               })}
             </div>
           </div>
         </Section>
+
+        {/* ── Effect floating popover (portal) ── */}
+        {expandedEffectId && effectAnchorRect && (() => {
+          const eff = effects.find(e => e.id === expandedEffectId);
+          if (!eff) return null;
+          return (
+            <>
+              {/* Click-away backdrop */}
+              <div
+                style={{ position:'fixed', inset:0, zIndex:2147483645 }}
+                onClick={() => { setExpandedEffectId(null); setEffectAnchorRect(null); }}
+              />
+              <EffectPopover
+                eff={eff}
+                anchorRect={effectAnchorRect}
+                onUpdate={patch => updateEffect(eff.id, patch)}
+                onClose={() => { setExpandedEffectId(null); setEffectAnchorRect(null); }}
+              />
+            </>
+          );
+        })()}
 
         {/* ─ Section 8: Transform ─ */}
         <Section title="Transform">
