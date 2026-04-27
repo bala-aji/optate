@@ -613,6 +613,206 @@ const EASING_CATEGORIES: Record<string, string[]> = {
   'Bounce': ['inBounce', 'outBounce', 'inOutBounce'],
 };
 
+// ─── Gradient Editor ──────────────────────────────────────────────────────────
+
+interface GradientStop { id: string; position: number; color: string; opacity: number; }
+
+function hexToRgb(hex: string) {
+  const clean = hex.replace('#', '');
+  return { r: parseInt(clean.slice(0,2),16), g: parseInt(clean.slice(2,4),16), b: parseInt(clean.slice(4,6),16) };
+}
+function rgbToHex(r: number, g: number, b: number) {
+  return '#' + [r,g,b].map(x => Math.max(0,Math.min(255,x)).toString(16).padStart(2,'0')).join('');
+}
+function buildGradientCss(type: string, angle: number, stops: GradientStop[]) {
+  const sorted = [...stops].sort((a,b) => a.position - b.position);
+  const cs = sorted.map(s => {
+    const {r,g,b} = hexToRgb(s.color);
+    return `rgba(${r},${g},${b},${(s.opacity/100).toFixed(2)}) ${s.position}%`;
+  }).join(', ');
+  if (type === 'radial') return `radial-gradient(circle, ${cs})`;
+  if (type === 'conic')  return `conic-gradient(from ${angle}deg, ${cs})`;
+  return `linear-gradient(${angle}deg, ${cs})`;
+}
+function parseGradientCss(css: string): { type: string; angle: number; stops: GradientStop[] } | null {
+  try {
+    let type = 'linear', angle = 135, stopsStr = '';
+    const lin = css.match(/linear-gradient\((\d+)deg,\s*(.+)\)$/);
+    const rad = css.match(/radial-gradient\((?:circle,\s*)?(.+)\)$/);
+    const con = css.match(/conic-gradient\((?:from\s+(\d+)deg,\s*)?(.+)\)$/);
+    if (lin)      { type='linear'; angle=parseInt(lin[1]); stopsStr=lin[2]; }
+    else if (rad) { type='radial'; stopsStr=rad[1]; }
+    else if (con) { type='conic'; angle=parseInt(con[1]||'0'); stopsStr=con[2]; }
+    else return null;
+    const stops: GradientStop[] = [];
+    for (const m of stopsStr.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)\s+([\d.]+)%/g)) {
+      const [,r,g,b,a,pos] = m;
+      stops.push({ id: Math.random().toString(36).slice(2), position: parseFloat(pos), color: rgbToHex(+r,+g,+b), opacity: Math.round((parseFloat(a??'1'))*100) });
+    }
+    if (stops.length < 2) return null;
+    return { type, angle, stops };
+  } catch { return null; }
+}
+
+const GradientEditor: React.FC<{ value: string; onChange: (css: string) => void }> = ({ value, onChange }) => {
+  const [type, setType] = useState('linear');
+  const [angle, setAngle] = useState(135);
+  const [stops, setStops] = useState<GradientStop[]>([
+    { id: 'a', position: 0,   color: '#ffffff', opacity: 100 },
+    { id: 'b', position: 100, color: '#999999', opacity: 100 },
+  ]);
+  const [activeId, setActiveId] = useState('a');
+  const barRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef<string | null>(null);
+
+  useEffect(() => {
+    const parsed = parseGradientCss(value);
+    if (parsed) {
+      setType(parsed.type); setAngle(parsed.angle); setStops(parsed.stops);
+      setActiveId(parsed.stops[0]?.id ?? '');
+    } else {
+      const def = [{ id:'a', position:0, color:'#ffffff', opacity:100 }, { id:'b', position:100, color:'#999999', opacity:100 }];
+      onChange(buildGradientCss('linear', 135, def));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const emit = (t=type, a=angle, s=stops) => onChange(buildGradientCss(t, a, s));
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current || !barRef.current) return;
+      const rect = barRef.current.getBoundingClientRect();
+      const pos = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width)*100)));
+      setStops(prev => { const next = prev.map(s => s.id===dragging.current ? {...s,position:pos} : s); onChange(buildGradientCss(type,angle,next)); return next; });
+    };
+    const onUp = () => { dragging.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [type, angle, onChange]);
+
+  const addStop = () => {
+    const ns: GradientStop = { id: Date.now().toString(36), position: 50, color: '#888888', opacity: 100 };
+    const next = [...stops, ns]; setStops(next); setActiveId(ns.id); emit(type, angle, next);
+  };
+  const removeStop = (id: string) => { const next = stops.filter(s=>s.id!==id); setStops(next); emit(type, angle, next); };
+  const updateStop = (id: string, patch: Partial<GradientStop>) => {
+    const next = stops.map(s => s.id===id ? {...s,...patch} : s); setStops(next); emit(type, angle, next);
+  };
+  const reverse = () => { const next = stops.map(s=>({...s,position:100-s.position})); setStops(next); emit(type,angle,next); };
+  const cssGradient = buildGradientCss(type, angle, stops);
+
+  return (
+    <div style={{ fontFamily: T.font }}>
+      {/* Type + controls */}
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10 }}>
+        <div style={{ position:'relative', flex:1 }}>
+          <select value={type} onChange={e=>{ setType(e.target.value); emit(e.target.value,angle,stops); }} style={{
+            width:'100%', appearance:'none', WebkitAppearance:'none',
+            background:T.inputBg, border:T.inputBorder, borderRadius:7,
+            color:T.valueColor, fontFamily:T.font, fontSize:12,
+            padding:'6px 28px 6px 10px', cursor:'pointer', outline:'none',
+          }}>
+            <option value="linear">Linear</option>
+            <option value="radial">Radial</option>
+            <option value="conic">Conic</option>
+          </select>
+          <svg style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+        </div>
+        {/* Reverse */}
+        <button onClick={reverse} title="Reverse" style={{ width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:7, cursor:'pointer', color:T.labelColor }}>
+          <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 8h14"/><polyline points="4,5 1,8 4,11"/><polyline points="12,5 15,8 12,11"/>
+          </svg>
+        </button>
+        {/* Angle (linear/conic) */}
+        {type !== 'radial' && (
+          <button onClick={()=>{ const a=(angle+45)%360; setAngle(a); emit(type,a,stops); }} title={`${angle}°`} style={{ width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:7, cursor:'pointer', color:T.labelColor }}>
+            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 3A7 7 0 1 0 14 10"/><polyline points="14,3 13,7 9,5"/>
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Preview bar + handles */}
+      <div style={{ position:'relative', marginBottom:16, userSelect:'none' }}>
+        {/* Handles */}
+        <div style={{ position:'relative', height:22, marginBottom:4 }}>
+          {stops.map(stop => (
+            <div key={stop.id}
+              onMouseDown={e=>{ e.preventDefault(); setActiveId(stop.id); dragging.current=stop.id; }}
+              style={{
+                position:'absolute', left:`calc(${stop.position}% - 11px)`, top:1,
+                width:20, height:20, borderRadius:5, background:stop.color, boxSizing:'border-box',
+                border: stop.id===activeId ? '2.5px solid #3b82f6' : '2px solid rgba(255,255,255,0.65)',
+                boxShadow: stop.id===activeId ? '0 0 0 2px rgba(59,130,246,0.35)' : '0 1px 4px rgba(0,0,0,0.45)',
+                cursor:'grab', transition:'border 0.1s, box-shadow 0.1s',
+              }} />
+          ))}
+        </div>
+        {/* Bar */}
+        <div ref={barRef} onClick={e=>{
+          if (!barRef.current || dragging.current) return;
+          const rect = barRef.current.getBoundingClientRect();
+          const pos = Math.round(((e.clientX-rect.left)/rect.width)*100);
+          const src = stops.find(s=>s.id===activeId) ?? stops[0];
+          const ns: GradientStop = {...src, id:Date.now().toString(36), position:pos};
+          const next = [...stops,ns]; setStops(next); setActiveId(ns.id); emit(type,angle,next);
+        }} style={{ height:28, borderRadius:8, background:cssGradient, cursor:'crosshair', boxShadow:'0 1px 4px rgba(0,0,0,0.3)' }} />
+      </div>
+
+      {/* Stops header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+        <span style={{ fontSize:11, fontWeight:600, color:T.valueColor }}>Stops</span>
+        <button onClick={addStop} style={{ width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:6, cursor:'pointer', color:T.labelColor, fontSize:16, lineHeight:1 }}>+</button>
+      </div>
+
+      {/* Stops list */}
+      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {[...stops].sort((a,b)=>a.position-b.position).map(stop => (
+          <div key={stop.id} onClick={()=>setActiveId(stop.id)} style={{
+            display:'flex', alignItems:'center', gap:5, padding:'5px 8px', borderRadius:8, cursor:'pointer',
+            background: stop.id===activeId ? 'rgba(59,130,246,0.12)' : T.inputBg,
+            border: stop.id===activeId ? '1px solid rgba(59,130,246,0.35)' : T.inputBorder,
+            transition:'all 0.12s',
+          }}>
+            {/* Position */}
+            <input type="number" min={0} max={100} value={stop.position}
+              onClick={e=>e.stopPropagation()}
+              onChange={e=>updateStop(stop.id,{position:Math.max(0,Math.min(100,+e.target.value))})}
+              style={{ width:32, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font }}
+            />
+            <span style={{ fontSize:10, color:T.labelColor }}>%</span>
+            {/* Color swatch */}
+            <div style={{ position:'relative', width:20, height:20, borderRadius:4, background:stop.color, border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }}>
+              <input type="color" value={stop.color} onChange={e=>updateStop(stop.id,{color:e.target.value})}
+                style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }} />
+            </div>
+            {/* Hex */}
+            <input value={stop.color.replace('#','').toUpperCase()} onClick={e=>e.stopPropagation()}
+              onChange={e=>{ const raw=e.target.value.replace(/[^0-9a-fA-F]/g,'').slice(0,6); if(raw.length===6) updateStop(stop.id,{color:'#'+raw}); }}
+              style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:`'SF Mono',ui-monospace,Menlo,monospace` }}
+            />
+            {/* Opacity */}
+            <input type="number" min={0} max={100} value={stop.opacity}
+              onClick={e=>e.stopPropagation()}
+              onChange={e=>updateStop(stop.id,{opacity:Math.max(0,Math.min(100,+e.target.value))})}
+              style={{ width:30, background:'transparent', border:'none', outline:'none', color:T.valueColor, fontSize:11, fontFamily:T.font, textAlign:'right' }}
+            />
+            <span style={{ fontSize:10, color:T.labelColor }}>%</span>
+            {/* Delete */}
+            {stops.length > 2 && (
+              <button onClick={e=>{e.stopPropagation(); removeStop(stop.id);}} style={{ background:'none', border:'none', cursor:'pointer', color:T.labelColor, fontSize:14, padding:'0 2px', lineHeight:1, display:'flex', alignItems:'center' }}>—</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ─── Image Upload ─────────────────────────────────────────────────────────────
 
 const UploadModal: React.FC<{
@@ -2083,14 +2283,17 @@ export const EditorPanel: React.FC = () => {
                 );
               })}
             </div>
-            {/* URL display + upload icon */}
-            {bgImageMode !== 'none' && (
+            {/* Gradient editor */}
+            {bgImageMode === 'gradient' && (
+              <GradientEditor
+                value={bgImage}
+                onChange={css => { setBgImage(css); applyProp('background-image', css); }}
+              />
+            )}
+            {/* Custom — URL display + upload */}
+            {bgImageMode === 'custom' && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <div style={{
-                  flex: 1, display: 'flex', alignItems: 'center', gap: 6,
-                  background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px',
-                  overflow: 'hidden',
-                }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px', overflow: 'hidden' }}>
                   <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
                     <rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="5.5" cy="7" r="1.2"/><polyline points="1,12 5,8 8,11 11,8 15,12"/>
                   </svg>
@@ -2099,15 +2302,8 @@ export const EditorPanel: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button
-                    title="Upload background image"
-                    onClick={() => (document.getElementById('optate-bg-upload') as HTMLInputElement)?.click()}
-                    style={{
-                      width: 30, height: 30, borderRadius: 7, border: T.inputBorder,
-                      background: T.inputBg, color: T.labelColor, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
+                  <button title="Upload" onClick={() => (document.getElementById('optate-bg-upload') as HTMLInputElement)?.click()}
+                    style={{ width:30, height:30, borderRadius:7, border:T.inputBorder, background:T.inputBg, color:T.labelColor, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="8,11 8,3"/><polyline points="5,6 8,3 11,6"/>
                       <path d="M3,12 Q3,14 8,14 Q13,14 13,12"/>
@@ -2118,13 +2314,14 @@ export const EditorPanel: React.FC = () => {
                 </div>
               </div>
             )}
+            {/* None — upload button */}
             {bgImageMode === 'none' && (
               <UploadButton label="Upload Background Image" onFile={f => handleFileSelect(f, 'bg-image')} />
             )}
           </div>
 
           {/* Background Position */}
-          {bgImageMode !== 'none' && (
+          {bgImageMode === 'custom' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font }}>Background position</span>
@@ -2162,7 +2359,7 @@ export const EditorPanel: React.FC = () => {
           )}
 
           {/* Background Size */}
-          {bgImageMode !== 'none' && (
+          {bgImageMode === 'custom' && (
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background size</span>
               <div style={{ display: 'flex', gap: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 9, padding: 3, marginBottom: bgSize === 'custom' ? 6 : 0 }}>
@@ -2195,7 +2392,7 @@ export const EditorPanel: React.FC = () => {
           )}
 
           {/* Background Repeat */}
-          {bgImageMode !== 'none' && (
+          {bgImageMode === 'custom' && (
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background repeat</span>
               <div style={{ position: 'relative' }}>
@@ -2223,7 +2420,7 @@ export const EditorPanel: React.FC = () => {
           )}
 
           {/* Background Attachment */}
-          {bgImageMode !== 'none' && (
+          {bgImageMode === 'custom' && (
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background attachment</span>
               <div style={{ position: 'relative' }}>
