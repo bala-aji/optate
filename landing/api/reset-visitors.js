@@ -24,6 +24,7 @@ module.exports = async function handler(req, res) {
     await Promise.all([
       redis(REDIS_URL, REDIS_TOKEN, 'DEL', 'optate:visitors'),
       redis(REDIS_URL, REDIS_TOKEN, 'DEL', 'optate:countries'),
+      redis(REDIS_URL, REDIS_TOKEN, 'DEL', 'optate:referrers'),
     ]);
     return res.status(200).json({ ok: true });
   } catch (err) {

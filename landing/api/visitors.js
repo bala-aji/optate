@@ -21,9 +21,10 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const [raw, countryRaw] = await Promise.all([
+    const [raw, countryRaw, referrerRaw] = await Promise.all([
       redis(REDIS_URL, REDIS_TOKEN, 'LRANGE', 'optate:visitors', 0, 199),
       redis(REDIS_URL, REDIS_TOKEN, 'ZREVRANGE', 'optate:countries', 0, 19, 'WITHSCORES'),
+      redis(REDIS_URL, REDIS_TOKEN, 'ZREVRANGE', 'optate:referrers', 0, 19, 'WITHSCORES'),
     ]);
 
     const visitors = (raw || []).map(s => {
@@ -37,7 +38,13 @@ module.exports = async function handler(req, res) {
       countries.push({ code: parts[0], name: parts.slice(1).join(':'), count: parseInt(arr[i + 1], 10) });
     }
 
-    return res.status(200).json({ visitors, countries });
+    const referrers = [];
+    const rarr = referrerRaw || [];
+    for (let i = 0; i < rarr.length; i += 2) {
+      referrers.push({ domain: rarr[i], count: parseInt(rarr[i + 1], 10) });
+    }
+
+    return res.status(200).json({ visitors, countries, referrers });
   } catch (err) {
     console.error('[visitors]', err);
     return res.status(500).json({ error: err.message });

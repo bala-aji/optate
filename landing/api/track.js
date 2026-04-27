@@ -84,6 +84,18 @@ module.exports = async function handler(req, res) {
         geo.country_code + ':' + (geo.country_name || ''));
     }
 
+    // Track referrer domain
+    let refDomain = '';
+    try {
+      if (referrer) {
+        const u = new URL(referrer);
+        refDomain = u.hostname.replace(/^www\./, '');
+      }
+    } catch (_) {}
+    if (refDomain) {
+      await redis(REDIS_URL, REDIS_TOKEN, 'ZINCRBY', 'optate:referrers', 1, refDomain);
+    }
+
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[track]', err);

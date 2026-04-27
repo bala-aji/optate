@@ -532,6 +532,39 @@
     </div>
   </div>
 
+  <!-- Sources / Referrers -->
+  <div class="two-col" style="margin-bottom:28px">
+    <div>
+      <div class="section-title">Sources</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer</th>
+              <th style="text-align:right;padding-right:20px">Visits</th>
+            </tr>
+          </thead>
+          <tbody id="referrersBody">
+            <tr><td colspan="2"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Top countries</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>Country</th><th>Visits</th><th style="width:90px"></th></tr>
+          </thead>
+          <tbody id="countriesBody">
+            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:90%;display:block;margin:6px 0"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="two-col" style="margin-bottom:28px">
     <div>
       <div class="section-title">Recent visitors</div>
@@ -547,14 +580,14 @@
       </div>
     </div>
     <div>
-      <div class="section-title">Top countries</div>
+      <div class="section-title">Top devices</div>
       <div class="table-card">
         <table>
           <thead>
-            <tr><th>Country</th><th>Visits</th><th style="width:90px"></th></tr>
+            <tr><th>Device</th><th>OS</th><th>Visits</th></tr>
           </thead>
-          <tbody id="countriesBody">
-            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:90%;display:block;margin:6px 0"></span></td></tr>
+          <tbody id="devicesBody">
+            <tr><td colspan="3"><span class="skeleton" style="height:12px;width:80%;display:block;margin:6px 0"></span></td></tr>
           </tbody>
         </table>
       </div>
@@ -596,7 +629,7 @@
 <script>
 const PKG = '@optate/plugin';
 const NPM_DL  = 'https://api.npmjs.org/downloads';
-const NPM_REG = `https://registry.npmjs.org/${encodeURIComponent(PKG)}`;
+const NPM_REG = 'https://registry.npmjs.org/@optate/plugin';
 
 function fmt(n) {
   if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'k';
@@ -773,6 +806,8 @@ async function loadVisitors() {
     renderVisitorKPIs(_visitorData);
     renderVisitorsTable(_visitorData.visitors || []);
     renderCountriesTable(_visitorData.countries || []);
+    renderReferrersTable(_visitorData.referrers || []);
+    renderDevicesTable(_visitorData.visitors || []);
     renderHeroStats();
     renderAnalyticsChart();
   } catch (e) {
@@ -817,6 +852,49 @@ function renderVisitorsTable(visitors) {
   }).join('');
 }
 
+function renderReferrersTable(referrers) {
+  const tbody = document.getElementById('referrersBody');
+  if (!referrers || !referrers.length) {
+    tbody.innerHTML = `<tr><td colspan="2" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No referrer data yet</td></tr>`;
+    return;
+  }
+  const maxCount = referrers[0]?.count || 1;
+  tbody.innerHTML = referrers.map(r => {
+    const favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(r.domain)}&sz=32`;
+    const pct = Math.round((r.count / maxCount) * 80);
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:9px">
+          <img src="${favicon}" width="16" height="16" style="border-radius:3px;flex-shrink:0" onerror="this.style.display='none'">
+          <span style="color:rgba(235,235,245,0.8);font-size:12px">${r.domain}</span>
+          <div class="mini-bar" style="width:${pct}px;max-width:80px;background:rgba(168,85,247,0.35);margin-left:4px"></div>
+        </div>
+      </td>
+      <td style="text-align:right;padding-right:20px;color:rgba(235,235,245,0.85);font-weight:600;font-size:13px">${fmtFull(r.count)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDevicesTable(visitors) {
+  const tbody = document.getElementById('devicesBody');
+  if (!visitors || !visitors.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No data yet</td></tr>`;
+    return;
+  }
+  const map = {};
+  visitors.forEach(v => {
+    const key = `${v.device}|${v.os}`;
+    map[key] = (map[key] || { device: v.device, os: v.os, count: 0 });
+    map[key].count++;
+  });
+  const rows = Object.values(map).sort((a, b) => b.count - a.count).slice(0, 10);
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td><span style="margin-right:6px">${DEVICE_ICON[r.device] || '?'}</span>${r.device}</td>
+    <td style="color:rgba(235,235,245,0.55)">${r.os}</td>
+    <td style="color:rgba(235,235,245,0.85);font-weight:600">${r.count}</td>
+  </tr>`).join('');
+}
+
 function renderCountriesTable(countries) {
   const tbody = document.getElementById('countriesBody');
   if (!countries.length) {
@@ -842,31 +920,35 @@ async function loadAll() {
   btn.classList.add('spinning');
   updateDateBadge();
 
+  const safe = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+
   try {
     const [dlDay, dlWeek, dlMonth, dlRange, registry] = await Promise.all([
-      fetch(`${NPM_DL}/point/last-day/${PKG}`).then(r => r.json()),
-      fetch(`${NPM_DL}/point/last-week/${PKG}`).then(r => r.json()),
-      fetch(`${NPM_DL}/point/last-month/${PKG}`).then(r => r.json()),
-      fetch(`${NPM_DL}/range/last-month/${PKG}`).then(r => r.json()),
-      fetch(NPM_REG).then(r => r.json()),
+      safe(`${NPM_DL}/point/last-day/${PKG}`),
+      safe(`${NPM_DL}/point/last-week/${PKG}`),
+      safe(`${NPM_DL}/point/last-month/${PKG}`),
+      safe(`${NPM_DL}/range/last-month/${PKG}`),
+      safe(NPM_REG),
     ]);
 
     _dlRangeData = dlRange;
     _dlMonthData = dlMonth;
 
-    renderKPIs(dlDay, dlWeek, dlMonth);
-    renderVersions(registry);
-    renderDaily(dlRange);
+    if (dlDay && dlWeek && dlMonth) renderKPIs(dlDay, dlWeek, dlMonth);
+    if (registry) renderVersions(registry);
+    if (dlRange)  renderDaily(dlRange);
 
     // Hero downloads stat
-    document.getElementById('hDownloads').textContent = fmtFull(dlMonth.downloads ?? 0);
+    document.getElementById('hDownloads').textContent = fmtFull(dlMonth?.downloads ?? 0);
 
     // Render chart with whatever visitor data we have so far
     renderAnalyticsChart();
 
     await loadVisitors();
 
-    document.getElementById('latestVersion').textContent = 'v' + (registry['dist-tags']?.latest ?? '—');
+    if (registry) {
+      document.getElementById('latestVersion').textContent = 'v' + (registry['dist-tags']?.latest ?? '—');
+    }
     document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     document.getElementById('errorBanner').style.display = 'none';
 
@@ -958,6 +1040,10 @@ async function resetAnalytics() {
     document.getElementById('visitorsBody').innerHTML =
       `<tr><td colspan="4" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No visitors yet</td></tr>`;
     document.getElementById('countriesBody').innerHTML =
+      `<tr><td colspan="3" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No data yet</td></tr>`;
+    document.getElementById('referrersBody').innerHTML =
+      `<tr><td colspan="2" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No referrer data yet</td></tr>`;
+    document.getElementById('devicesBody').innerHTML =
       `<tr><td colspan="3" style="color:rgba(235,235,245,0.25);font-size:12px;padding:20px 18px;text-align:center">No data yet</td></tr>`;
 
     // Clear visitor KPIs
