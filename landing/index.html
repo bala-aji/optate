@@ -242,7 +242,9 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--accent-gradient);
+      background: linear-gradient(270deg, #a855f7, #ec4899, #22d3ee, #a855f7);
+      background-size: 300% 300%;
+      animation: gradientShift 4s ease infinite;
       color: #fff;
       font-size: 15px;
       font-weight: 600;
@@ -250,14 +252,37 @@
       border-radius: 30px;
       text-decoration: none;
       letter-spacing: -0.01em;
-      transition: opacity 0.15s, transform 0.15s;
-      box-shadow: 0 4px 24px rgba(168, 85, 247, 0.35);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 24px rgba(168, 85, 247, 0.4);
     }
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .btn-primary:hover { transform: translateY(-1px); opacity: 0.92; }
 
-    .btn-primary:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
+    .btn-demo-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      color: #0a0a0b;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 13px 28px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: -0.01em;
+      transition: background 0.15s, transform 0.15s;
+      box-shadow: 0 4px 24px rgba(255,255,255,0.15);
     }
+    .btn-demo-active:hover { background: #f0f0f0; transform: translateY(-1px); }
 
     .btn-secondary {
       display: inline-flex;
@@ -1059,27 +1084,54 @@
 
   <!-- Live demo launcher -->
   <script>
-    function launchDemo() {
-      const btn = document.getElementById('tryDemoBtn');
-      if (btn.dataset.loaded) return;
+    var demoActive = false;
 
-      btn.textContent = 'Loading…';
+    function launchDemo() {
+      if (demoActive) {
+        closeDemo();
+        return;
+      }
+
+      const btn = document.getElementById('tryDemoBtn');
       btn.disabled = true;
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;animation:spin 0.8s linear infinite"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="20" stroke-dashoffset="5"/></svg> Loading…`;
+
+      if (window.__optateLoaded) {
+        activateDemo();
+        return;
+      }
 
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/@optate/plugin@latest/dist/client.js';
       script.onload = function () {
-        btn.dataset.loaded = 'true';
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M3 8.5L6.5 12L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Demo Active`;
-        btn.style.background = 'linear-gradient(135deg,#34d399,#059669)';
-        btn.style.boxShadow = '0 4px 24px rgba(52,211,153,0.35)';
-        btn.disabled = false;
+        window.__optateLoaded = true;
+        activateDemo();
       };
       script.onerror = function () {
-        btn.textContent = 'Try Live Demo';
         btn.disabled = false;
+        btn.className = 'btn-primary';
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 5.5L10.5 8L6.5 10.5V5.5Z" fill="currentColor"/></svg> Try Live Demo`;
       };
       document.head.appendChild(script);
+    }
+
+    function activateDemo() {
+      demoActive = true;
+      const btn = document.getElementById('tryDemoBtn');
+      btn.disabled = false;
+      btn.className = 'btn-demo-active';
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Close Demo`;
+      btn.onclick = closeDemo;
+    }
+
+    function closeDemo() {
+      demoActive = false;
+      const host = document.getElementById('optate-host');
+      if (host) host.remove();
+      const btn = document.getElementById('tryDemoBtn');
+      btn.className = 'btn-primary';
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 5.5L10.5 8L6.5 10.5V5.5Z" fill="currentColor"/></svg> Try Live Demo`;
+      btn.onclick = launchDemo;
     }
   </script>
 
