@@ -202,9 +202,101 @@
       background: rgba(168,85,247,0.5);
       transition: width 0.5s ease;
     }
+
+    /* ── Login overlay ── */
+    #loginOverlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0b;
+      align-items: center; justify-content: center;
+    }
+    #appShell { display: none; }
+
+    .login-card {
+      width: 100%; max-width: 380px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 20px;
+      padding: 36px 32px;
+      margin: 16px;
+    }
+    .login-logo { margin-bottom: 24px; }
+    .login-logo img { height: 20px; }
+    .login-title {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
+      color: rgba(235,235,245,0.92); margin-bottom: 4px;
+    }
+    .login-sub {
+      font-size: 13px; color: rgba(235,235,245,0.35);
+      margin-bottom: 28px;
+    }
+    .login-field { margin-bottom: 14px; }
+    .login-field label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: rgba(235,235,245,0.4); letter-spacing: 0.04em;
+      text-transform: uppercase; margin-bottom: 6px;
+    }
+    .login-field input {
+      width: 100%; padding: 11px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; outline: none;
+      color: rgba(235,235,245,0.9); font-size: 14px;
+      font-family: inherit; transition: border-color 0.15s;
+    }
+    .login-field input:focus { border-color: rgba(168,85,247,0.6); }
+    .login-error {
+      display: none;
+      font-size: 12px; color: rgba(239,68,68,0.85);
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.18);
+      border-radius: 8px; padding: 9px 12px;
+      margin-bottom: 14px;
+    }
+    .login-btn {
+      width: 100%; padding: 12px;
+      background: rgba(168,85,247,0.85);
+      border: none; border-radius: 10px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: background 0.15s; letter-spacing: -0.01em;
+    }
+    .login-btn:hover:not(:disabled) { background: rgba(168,85,247,1); }
+    .login-btn:disabled { opacity: 0.6; cursor: default; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60%  { transform: translateX(-6px); }
+      40%,80%  { transform: translateX(6px); }
+    }
+    @keyframes fadeOut { to { opacity: 0; } }
   </style>
 </head>
 <body>
+
+<!-- Login overlay -->
+<div id="loginOverlay">
+  <div class="login-card" id="loginCard">
+    <div class="login-logo"><img src="/logo.png" alt="Optate" /></div>
+    <div class="login-title">Admin sign in</div>
+    <div class="login-sub">Access the Optate analytics dashboard</div>
+    <form id="loginForm" autocomplete="off">
+      <div class="login-field">
+        <label>Email</label>
+        <input id="loginEmail" type="email" placeholder="admin@optate.dev" autocomplete="username" required />
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <input id="loginPass" type="password" placeholder="••••••••••" autocomplete="current-password" required />
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <button class="login-btn" id="loginBtn" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- Dashboard (hidden until logged in) -->
+<div id="appShell">
 
 <!-- Topbar -->
 <div class="topbar">
@@ -221,6 +313,12 @@
         <path d="M13.5 2v3.5H10"/>
       </svg>
       Refresh
+    </button>
+    <button class="refresh-btn" id="logoutBtn" style="color:rgba(239,68,68,0.7);border-color:rgba(239,68,68,0.15)">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/>
+      </svg>
+      Sign out
     </button>
   </div>
 </div>
@@ -310,6 +408,7 @@
   </div>
 
 </div><!-- /container -->
+</div><!-- /appShell -->
 
 <script>
 const PKG = '@optate/plugin';
@@ -523,8 +622,68 @@ function renderDaily(dlRange) {
   }).join('');
 }
 
-// Init
-loadAll();
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const SESSION_KEY = 'optate_admin_auth';
+// SHA-256 of "admin@optate.dev:Optate@2026"
+const VALID_HASH  = '685cd5890bca3fb73a20b9871ca58dd233f0df507e085b6ae2aa2396ec826104';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function showDashboard() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+  loadAll();
+}
+
+function checkSession() {
+  if (sessionStorage.getItem(SESSION_KEY) === 'true') showDashboard();
+  else document.getElementById('loginOverlay').style.display = 'flex';
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const btn   = document.getElementById('loginBtn');
+  const err   = document.getElementById('loginError');
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  err.style.display = 'none';
+
+  try {
+    const hash = await sha256(email + ':' + pass);
+    if (hash === VALID_HASH) {
+      sessionStorage.setItem(SESSION_KEY, 'true');
+      document.getElementById('loginOverlay').style.animation = 'fadeOut 0.25s ease forwards';
+      setTimeout(showDashboard, 250);
+    } else {
+      err.textContent = 'Invalid email or password.';
+      err.style.display = 'block';
+      document.getElementById('loginCard').style.animation = 'shake 0.35s ease';
+      setTimeout(() => document.getElementById('loginCard').style.animation = '', 400);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+function handleLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginOverlay').style.cssText = 'display:flex;animation:none';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+document.getElementById('loginForm').addEventListener('submit', handleLogin);
+document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+checkSession();
 </script>
 </body>
 </html>
