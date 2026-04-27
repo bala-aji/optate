@@ -804,17 +804,29 @@ const GradientEditor: React.FC<{ value: string; onChange: (css: string) => void 
 const EffectPopover: React.FC<{
   eff: EffectItem;
   anchorRect: DOMRect;
+  panelRect: DOMRect;
   onUpdate: (patch: Partial<EffectItem>) => void;
   onClose: () => void;
-}> = ({ eff, anchorRect, onUpdate, onClose }) => {
+}> = ({ eff, anchorRect, panelRect, onUpdate, onClose }) => {
   const isShadow = eff.type === 'drop-shadow' || eff.type === 'inner-shadow';
   const isBlur   = eff.type === 'layer-blur'  || eff.type === 'background-blur';
 
-  // Position: to the LEFT of the anchor rect, clamped to viewport
-  const width = 280;
-  const gap   = 12;
-  const left  = Math.max(8, anchorRect.left - width - gap);
-  const top   = Math.min(window.innerHeight - 400, Math.max(8, anchorRect.top - 10));
+  const popoverWidth = 280;
+  const gap = 12;
+
+  // Decide: place to LEFT or RIGHT of panel based on available space
+  const spaceLeft  = panelRect.left - gap;
+  const spaceRight = window.innerWidth - panelRect.right - gap;
+  const placeRight = spaceLeft < popoverWidth && spaceRight >= popoverWidth;
+
+  const left = placeRight
+    ? panelRect.right + gap
+    : Math.max(8, panelRect.left - popoverWidth - gap);
+
+  const top = Math.min(
+    window.innerHeight - 420,
+    Math.max(8, anchorRect.top - 10),
+  );
 
   return (
     <div
@@ -822,7 +834,7 @@ const EffectPopover: React.FC<{
       onClick={e => e.stopPropagation()}
       style={{
         position: 'fixed', zIndex: 2147483646,
-        left, top, width,
+        left, top, width: popoverWidth,
         background: 'rgba(28,28,30,0.97)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -1380,6 +1392,7 @@ export const EditorPanel: React.FC = () => {
   const [effects, setEffects] = useState<EffectItem[]>([]);
   const [expandedEffectId, setExpandedEffectId] = useState<string | null>(null);
   const [effectAnchorRect, setEffectAnchorRect] = useState<DOMRect | null>(null);
+  const [effectPanelRect, setEffectPanelRect] = useState<DOMRect | null>(null);
 
   // Transform
   const [rotate, setRotate] = useState('0');
@@ -1940,8 +1953,10 @@ export const EditorPanel: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div style={panelStyle} onClick={() => showDomTree && setShowDomTree(false)}>
+    <div ref={panelRef} style={panelStyle} onClick={() => showDomTree && setShowDomTree(false)}>
       {/* ── Upload Modal ── */}
       {uploadPending && (
         <UploadModal
@@ -2738,8 +2753,12 @@ export const EditorPanel: React.FC = () => {
                     {/* Preview square — click opens floating popover */}
                     <div
                       onClick={e => {
-                        if (isExpanded) { setExpandedEffectId(null); setEffectAnchorRect(null); }
-                        else { setExpandedEffectId(eff.id); setEffectAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect()); }
+                        if (isExpanded) { setExpandedEffectId(null); setEffectAnchorRect(null); setEffectPanelRect(null); }
+                        else {
+                          setExpandedEffectId(eff.id);
+                          setEffectAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
+                          setEffectPanelRect(panelRef.current?.getBoundingClientRect() ?? null);
+                        }
                       }}
                       style={{
                         width:28, height:28, borderRadius:6, flexShrink:0, cursor:'pointer',
@@ -2771,7 +2790,7 @@ export const EditorPanel: React.FC = () => {
                       {eff.visible ? <Eye size={14} strokeWidth={1.5}/> : <EyeOff size={14} strokeWidth={1.5}/>}
                     </button>
                     {/* Delete */}
-                    <button onClick={()=>{ removeEffect(eff.id); if(isExpanded){setExpandedEffectId(null);setEffectAnchorRect(null);} }} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
+                    <button onClick={()=>{ removeEffect(eff.id); if(isExpanded){setExpandedEffectId(null);setEffectAnchorRect(null);setEffectPanelRect(null);} }} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
                       <Minus size={12} strokeWidth={1.8}/>
                     </button>
                   </div>
@@ -2782,21 +2801,19 @@ export const EditorPanel: React.FC = () => {
         </Section>
 
         {/* ── Effect floating popover (portal) ── */}
-        {expandedEffectId && effectAnchorRect && (() => {
+        {expandedEffectId && effectAnchorRect && effectPanelRect && (() => {
           const eff = effects.find(e => e.id === expandedEffectId);
           if (!eff) return null;
+          const closePopover = () => { setExpandedEffectId(null); setEffectAnchorRect(null); setEffectPanelRect(null); };
           return (
             <>
-              {/* Click-away backdrop */}
-              <div
-                style={{ position:'fixed', inset:0, zIndex:2147483645 }}
-                onClick={() => { setExpandedEffectId(null); setEffectAnchorRect(null); }}
-              />
+              <div style={{ position:'fixed', inset:0, zIndex:2147483644 }} onClick={closePopover} />
               <EffectPopover
                 eff={eff}
                 anchorRect={effectAnchorRect}
+                panelRect={effectPanelRect}
                 onUpdate={patch => updateEffect(eff.id, patch)}
-                onClose={() => { setExpandedEffectId(null); setEffectAnchorRect(null); }}
+                onClose={closePopover}
               />
             </>
           );
