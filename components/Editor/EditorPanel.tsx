@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, createPortal } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelection } from '@/lib/selection-context';
 import { applyStyle, getComputedStyleValue, rgbToHex } from '@/lib/css-utils';
 import { changeTracker } from '@/lib/change-tracker';
@@ -810,18 +810,16 @@ const EffectPopover: React.FC<{
   const isShadow = eff.type === 'drop-shadow' || eff.type === 'inner-shadow';
   const isBlur   = eff.type === 'layer-blur'  || eff.type === 'background-blur';
 
-  // Position: to the LEFT of the anchor, vertically centred on it
-  const width  = 280;
-  const gap    = 12;
-  const left   = Math.max(8, anchorRect.left - width - gap);
-  const top    = Math.min(
-    window.innerHeight - 380,
-    Math.max(8, anchorRect.top - 10),
-  );
+  // Position: to the LEFT of the anchor rect, clamped to viewport
+  const width = 280;
+  const gap   = 12;
+  const left  = Math.max(8, anchorRect.left - width - gap);
+  const top   = Math.min(window.innerHeight - 400, Math.max(8, anchorRect.top - 10));
 
-  const popover = (
+  return (
     <div
       onMouseDown={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
       style={{
         position: 'fixed', zIndex: 2147483646,
         left, top, width,
@@ -943,7 +941,6 @@ const EffectPopover: React.FC<{
     </div>
   );
 
-  return createPortal(popover, document.body) as React.ReactElement;
 };
 
 // ─── Image Upload ─────────────────────────────────────────────────────────────
