@@ -4,6 +4,13 @@ import { applyStyle, getComputedStyleValue, rgbToHex } from '@/lib/css-utils';
 import { changeTracker } from '@/lib/change-tracker';
 import { loadGoogleFont } from '@/lib/dom-utils';
 import { animate, spring, remove, cubicBezier, eases } from 'animejs';
+import {
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  ChevronDown, X, Trash2, ArrowLeftRight, RotateCcw,
+  Link, Eye, EyeOff, Upload, Image, Crosshair,
+  MoveHorizontal, MoveVertical, Repeat2, Paperclip,
+  LayoutGrid, Minus, Droplet, Network,
+} from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,52 +43,24 @@ const T = {
 
 // ─── Tiny SVG icons ────────────────────────────────────────────────────────────
 
-const Icon = ({ d, size = 14, color = 'rgba(255,255,255,0.6)' }: { d: string; size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d={d} />
-  </svg>
-);
-
 const ChevronIcon = ({ rotated }: { rotated: boolean }) => (
-  <svg
-    width={12} height={12} viewBox="0 0 24 24" fill="none"
-    stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round"
-    style={{ transform: rotated ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease', flexShrink: 0 }}
-  >
-    <path d="M6 9l6 6 6-6" />
-  </svg>
+  <ChevronDown
+    size={12} strokeWidth={1.5}
+    style={{ color: 'rgba(255,255,255,0.35)', transform: rotated ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease', flexShrink: 0 }}
+  />
 );
 
-const DeleteIcon = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={13} color="rgba(255,100,100,0.8)" />;
-const FlipIcon = () => <Icon d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" size={13} />;
-const CloseIcon = () => <Icon d="M18 6L6 18M6 6l12 12" size={13} />;
+const DeleteIcon = () => <Trash2 size={13} strokeWidth={1.5} style={{ color: 'rgba(255,100,100,0.8)' }} />;
+const FlipIcon = () => <ArrowLeftRight size={13} strokeWidth={1.5} style={{ color: 'rgba(255,255,255,0.6)' }} />;
+const CloseIcon = () => <X size={13} strokeWidth={1.5} style={{ color: 'rgba(255,255,255,0.6)' }} />;
 
 // ─── Align icons ──────────────────────────────────────────────────────────────
-const AlignLeftIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/>
-  </svg>
-);
-const AlignCenterIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-  </svg>
-);
-const AlignRightIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/>
-  </svg>
-);
-const AlignJustifyIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-  </svg>
-);
+const AlignLeftIcon = () => <AlignLeft size={14} strokeWidth={1.5} />;
+const AlignCenterIcon = () => <AlignCenter size={14} strokeWidth={1.5} />;
+const AlignRightIcon = () => <AlignRight size={14} strokeWidth={1.5} />;
+const AlignJustifyIcon = () => <AlignJustify size={14} strokeWidth={1.5} />;
 const LinkIcon = ({ linked }: { linked: boolean }) => (
-  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={linked ? T.accent : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round">
-    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-  </svg>
+  <Link size={13} strokeWidth={1.5} style={{ color: linked ? T.accent : 'rgba(255,255,255,0.35)' }} />
 );
 
 // ─── Section ──────────────────────────────────────────────────────────────────
@@ -729,20 +708,16 @@ const GradientEditor: React.FC<{ value: string; onChange: (css: string) => void 
             <option value="radial">Radial</option>
             <option value="conic">Conic</option>
           </select>
-          <svg style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+          <ChevronDown size={10} strokeWidth={1.8} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
         </div>
         {/* Reverse */}
         <button onClick={reverse} title="Reverse" style={{ width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:7, cursor:'pointer', color:T.labelColor }}>
-          <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 8h14"/><polyline points="4,5 1,8 4,11"/><polyline points="12,5 15,8 12,11"/>
-          </svg>
+          <ArrowLeftRight size={14} strokeWidth={1.5} />
         </button>
         {/* Angle (linear/conic) */}
         {type !== 'radial' && (
           <button onClick={()=>{ const a=(angle+45)%360; setAngle(a); emit(type,a,stops); }} title={`${angle}°`} style={{ width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:7, cursor:'pointer', color:T.labelColor }}>
-            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 3A7 7 0 1 0 14 10"/><polyline points="14,3 13,7 9,5"/>
-            </svg>
+            <RotateCcw size={14} strokeWidth={1.5} />
           </button>
         )}
       </div>
@@ -893,9 +868,7 @@ const UploadButton: React.FC<{ label: string; onFile: (file: File) => void }> = 
         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; }}
         onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
       >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M8 11V3M4 6l4-4 4 4M2 13h12" />
-        </svg>
+        <Upload size={12} strokeWidth={1.5} />
         {label}
       </button>
     </>
@@ -1850,9 +1823,7 @@ export const EditorPanel: React.FC = () => {
           style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden', cursor: 'pointer' }}
         >
           {/* Tree icon */}
-          <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke={showDomTree ? T.accent : 'rgba(255,255,255,0.35)'} strokeWidth="1.6" strokeLinecap="round">
-            <path d="M2 3h4M2 8h4M2 13h4M6 3v10M10 6h4M10 11h4M14 6v5" />
-          </svg>
+          <Network size={13} strokeWidth={1.5} style={{ color: showDomTree ? T.accent : 'rgba(255,255,255,0.35)' }} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px',
             borderRadius: 7,
@@ -1935,7 +1906,7 @@ export const EditorPanel: React.FC = () => {
                 <option value="sticky">Sticky</option>
               </select>
               {/* Chevron */}
-              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              <ChevronDown size={10} strokeWidth={1.8} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
             </div>
           </div>
 
@@ -1962,7 +1933,7 @@ export const EditorPanel: React.FC = () => {
                 <option value="inline-grid">Inline-grid</option>
                 <option value="none">None</option>
               </select>
-              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              <ChevronDown size={10} strokeWidth={1.8} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
             </div>
           </div>
 
@@ -1971,18 +1942,8 @@ export const EditorPanel: React.FC = () => {
             <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Flow direction</span>
           <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 9, padding: 3 }}>
             {([
-              { dir: 'row',    title: 'Horizontal',
-                icon: <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="8" x2="15" y2="8"/>
-                  <polyline points="4,5 1,8 4,11"/>
-                  <polyline points="12,5 15,8 12,11"/>
-                </svg> },
-              { dir: 'column', title: 'Vertical',
-                icon: <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="1" x2="8" y2="15"/>
-                  <polyline points="5,4 8,1 11,4"/>
-                  <polyline points="5,12 8,15 11,12"/>
-                </svg> },
+              { dir: 'row',    title: 'Horizontal', icon: <MoveHorizontal size={16} strokeWidth={1.5} /> },
+              { dir: 'column', title: 'Vertical',   icon: <MoveVertical size={16} strokeWidth={1.5} /> },
             ] as Array<{ dir: string; title: string; icon: React.ReactNode }>).map(({ dir, title, icon }) => {
               const active = flexDirection === dir;
               return (
@@ -2148,13 +2109,7 @@ export const EditorPanel: React.FC = () => {
                 background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px',
               }}>
                 {/* Gap icon — two bars with arrow between */}
-                <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                  <line x1="2" y1="3" x2="2" y2="13"/>
-                  <line x1="14" y1="3" x2="14" y2="13"/>
-                  <line x1="5" y1="8" x2="11" y2="8"/>
-                  <polyline points="5,6 3,8 5,10"/>
-                  <polyline points="11,6 13,8 11,10"/>
-                </svg>
+                <MoveHorizontal size={14} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                 <input
                   defaultValue={gap}
                   key={gap}
@@ -2178,7 +2133,7 @@ export const EditorPanel: React.FC = () => {
                   <option>%</option>
                   <option>rem</option>
                 </select>
-                <svg style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={8} height={8} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                <ChevronDown size={8} strokeWidth={1.8} style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
               </div>
             </div>
           </div>
@@ -2187,8 +2142,8 @@ export const EditorPanel: React.FC = () => {
             <span style={{ fontSize: 10, color: T.labelColor, fontFamily: T.font, display: 'block', marginBottom: 5, letterSpacing: '0.04em' }}>Visibility</span>
             <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 9, padding: 3 }}>
               {[
-                { v: 'visible', label: 'Visible', icon: <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="2"/></svg> },
-                { v: 'hidden',  label: 'Hidden',  icon: <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="2" x2="14" y2="14"/><path d="M6.5 3.5A7 4 0 0 1 14 8"/><path d="M2 6a7 4 0 0 0 8.5 5.5"/></svg> },
+                { v: 'visible', label: 'Visible', icon: <Eye size={14} strokeWidth={1.5} /> },
+                { v: 'hidden',  label: 'Hidden',  icon: <EyeOff size={14} strokeWidth={1.5} /> },
               ].map(({ v, label, icon }) => {
                 const active = visibility === v;
                 return (
@@ -2224,7 +2179,7 @@ export const EditorPanel: React.FC = () => {
                 <option value="auto">Auto</option>
                 <option value="clip">Clip</option>
               </select>
-              <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+              <ChevronDown size={10} strokeWidth={1.8} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
             </div>
           </div>
 
@@ -2251,7 +2206,7 @@ export const EditorPanel: React.FC = () => {
                   <option value="inline-start">Inline-start</option>
                   <option value="inline-end">Inline-end</option>
                 </select>
-                <svg style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                <ChevronDown size={10} strokeWidth={1.8} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
               </div>
             </div>
             {/* Clear */}
@@ -2271,7 +2226,7 @@ export const EditorPanel: React.FC = () => {
                   <option value="inline-start">Inline-start</option>
                   <option value="inline-end">Inline-end</option>
                 </select>
-                <svg style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                <ChevronDown size={10} strokeWidth={1.8} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.labelColor }} />
               </div>
             </div>
           </div>
@@ -2331,9 +2286,7 @@ export const EditorPanel: React.FC = () => {
             {bgImageMode === 'custom' && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px', overflow: 'hidden' }}>
-                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                    <rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="5.5" cy="7" r="1.2"/><polyline points="1,12 5,8 8,11 11,8 15,12"/>
-                  </svg>
+                  <Image size={13} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                   <span style={{ fontSize: 11, color: T.valueColor, fontFamily: T.font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {bgImage !== 'none' ? bgImage : '—'}
                   </span>
@@ -2341,10 +2294,7 @@ export const EditorPanel: React.FC = () => {
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button title="Upload" onClick={() => (document.getElementById('optate-bg-upload') as HTMLInputElement)?.click()}
                     style={{ width:30, height:30, borderRadius:7, border:T.inputBorder, background:T.inputBg, color:T.labelColor, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="8,11 8,3"/><polyline points="5,6 8,3 11,6"/>
-                      <path d="M3,12 Q3,14 8,14 Q13,14 13,12"/>
-                    </svg>
+                    <Upload size={14} strokeWidth={1.5} />
                   </button>
                   <input id="optate-bg-upload" type="file" accept="image/*" style={{ display: 'none' }}
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f, 'bg-image'); e.target.value = ''; }} />
@@ -2364,18 +2314,13 @@ export const EditorPanel: React.FC = () => {
                 <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font }}>Background position</span>
                 {/* Fit icon */}
                 <button title="Reset to center" onClick={() => { handleBgPosX('50%'); handleBgPosY('50%'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: T.labelColor }}>
-                  <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="1" y="1" width="14" height="14" rx="2"/>
-                    <line x1="4" y1="8" x2="12" y2="8"/><line x1="8" y1="4" x2="8" y2="12"/>
-                  </svg>
+                  <Crosshair size={14} strokeWidth={1.5} />
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {/* X */}
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
-                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                    <line x1="2" y1="8" x2="14" y2="8"/><polyline points="5,5 2,8 5,11"/><polyline points="11,5 14,8 11,11"/>
-                  </svg>
+                  <MoveHorizontal size={13} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                   <input defaultValue={bgPosX} key={`posx-${bgPosX}`}
                     onBlur={e => handleBgPosX(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleBgPosX((e.target as HTMLInputElement).value); }}
@@ -2383,9 +2328,7 @@ export const EditorPanel: React.FC = () => {
                 </div>
                 {/* Y */}
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
-                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                    <line x1="8" y1="2" x2="8" y2="14"/><polyline points="5,5 8,2 11,5"/><polyline points="5,11 8,14 11,11"/>
-                  </svg>
+                  <MoveVertical size={13} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                   <input defaultValue={bgPosY} key={`posy-${bgPosY}`}
                     onBlur={e => handleBgPosY(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleBgPosY((e.target as HTMLInputElement).value); }}
@@ -2434,10 +2377,7 @@ export const EditorPanel: React.FC = () => {
               <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background repeat</span>
               <div style={{ position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
-                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                    <polyline points="3,11 1,13 3,15"/><polyline points="13,1 15,3 13,5"/>
-                    <path d="M15,3 H5 a2,2 0 0 0 -2,2 v4"/><path d="M1,13 H11 a2,2 0 0 0 2,-2 V7"/>
-                  </svg>
+                  <Repeat2 size={13} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                   <select value={bgRepeat} onChange={e => handleBgRepeat(e.target.value)} style={{
                     flex: 1, appearance: 'none', WebkitAppearance: 'none',
                     background: 'transparent', border: 'none', outline: 'none',
@@ -2450,7 +2390,7 @@ export const EditorPanel: React.FC = () => {
                     <option value="round">Round</option>
                     <option value="space">Space</option>
                   </select>
-                  <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}><polyline points="2,3 5,7 8,3"/></svg>
+                  <ChevronDown size={10} strokeWidth={1.8} style={{ color: T.labelColor, flexShrink: 0 }} />
                 </div>
               </div>
             </div>
@@ -2462,9 +2402,7 @@ export const EditorPanel: React.FC = () => {
               <span style={{ fontSize: 11, fontWeight: 600, color: T.valueColor, fontFamily: T.font, display: 'block', marginBottom: 6 }}>Background attachment</span>
               <div style={{ position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.inputBg, border: T.inputBorder, borderRadius: 7, padding: '5px 8px' }}>
-                  <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.labelColor, flexShrink: 0 }}>
-                    <path d="M9.5 2.5 L13.5 6.5 L7 13 Q4 14 3 11 Q2 8 5 7 Z"/><line x1="2" y1="14" x2="5" y2="11"/>
-                  </svg>
+                  <Paperclip size={13} strokeWidth={1.5} style={{ color: T.labelColor, flexShrink: 0 }} />
                   <select value={bgAttachment} onChange={e => handleBgAttachment(e.target.value)} style={{
                     flex: 1, appearance: 'none', WebkitAppearance: 'none',
                     background: 'transparent', border: 'none', outline: 'none',
@@ -2474,7 +2412,7 @@ export const EditorPanel: React.FC = () => {
                     <option value="fixed">Fixed</option>
                     <option value="local">Local</option>
                   </select>
-                  <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: T.labelColor, flexShrink: 0 }}><polyline points="2,3 5,7 8,3"/></svg>
+                  <ChevronDown size={10} strokeWidth={1.8} style={{ color: T.labelColor, flexShrink: 0 }} />
                 </div>
               </div>
             </div>
@@ -2633,10 +2571,7 @@ export const EditorPanel: React.FC = () => {
               <span style={{ fontSize:11, fontWeight:600, color:T.valueColor, fontFamily:T.font }}>Effects</span>
               <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                 {/* Grid view icon */}
-                <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color:T.labelColor }}>
-                  <rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/>
-                  <rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>
-                </svg>
+                <LayoutGrid size={14} strokeWidth={1.5} style={{ color: T.labelColor }} />
                 {/* Add button */}
                 <button onClick={addEffect} style={{ width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', background:T.inputBg, border:T.inputBorder, borderRadius:6, cursor:'pointer', color:T.labelColor, fontSize:16, lineHeight:1 }}>+</button>
               </div>
@@ -2682,18 +2617,18 @@ export const EditorPanel: React.FC = () => {
                           <option value="layer-blur">Layer blur</option>
                           <option value="background-blur">Background blur</option>
                         </select>
-                        <svg style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={9} height={9} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                        <ChevronDown size={9} strokeWidth={1.8} style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
                       </div>
                       {/* Visibility toggle */}
                       <button onClick={()=>toggleEffect(eff.id)} title={eff.visible?'Hide':'Show'} style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color: eff.visible ? T.valueColor : 'rgba(255,255,255,0.2)', padding:0 }}>
                         {eff.visible
-                          ? <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="2"/></svg>
-                          : <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="2" x2="14" y2="14"/><path d="M6.5 3.5A7 4 0 0 1 14 8"/><path d="M2 6a7 4 0 0 0 8.5 5.5"/></svg>
+                          ? <Eye size={14} strokeWidth={1.5} />
+                          : <EyeOff size={14} strokeWidth={1.5} />
                         }
                       </button>
                       {/* Delete */}
                       <button onClick={()=>removeEffect(eff.id)} title="Remove" style={{ width:26, height:26, display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.35)', padding:0 }}>
-                        <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="1" y1="6" x2="11" y2="6"/></svg>
+                        <Minus size={12} strokeWidth={1.8} />
                       </button>
                     </div>
 
@@ -2712,14 +2647,12 @@ export const EditorPanel: React.FC = () => {
                               <option value="layer-blur">Layer blur</option>
                               <option value="background-blur">Background blur</option>
                             </select>
-                            <svg style={{ position:'absolute', right:2, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} width={9} height={9} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="2,3 5,7 8,3"/></svg>
+                            <ChevronDown size={9} strokeWidth={1.8} style={{ position:'absolute', right:2, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:T.labelColor }} />
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                             {/* Waterdrop / blur icon */}
                             {isShadow && (
-                              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color:T.labelColor }}>
-                                <path d="M8 2 C8 2 3 8 3 11a5 5 0 0 0 10 0C13 8 8 2 8 2Z"/>
-                              </svg>
+                              <Droplet size={14} strokeWidth={1.5} style={{ color: T.labelColor }} />
                             )}
                             {isBlur && (
                               <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color:T.labelColor }}>
@@ -2729,7 +2662,7 @@ export const EditorPanel: React.FC = () => {
                             )}
                             {/* Close */}
                             <button onClick={()=>setExpandedEffectId(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.labelColor, padding:2, display:'flex', alignItems:'center' }}>
-                              <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg>
+                              <X size={12} strokeWidth={2} />
                             </button>
                           </div>
                         </div>
