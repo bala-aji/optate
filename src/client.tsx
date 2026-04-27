@@ -49,6 +49,10 @@ function unmount() {
   if (host) host.remove();
 }
 
+// Expose mount/unmount globally so embedding pages can control the panel
+(window as any).optateMount   = mount;
+(window as any).optateUnmount = unmount;
+
 // Toggle via keyboard: Alt+Shift+O
 window.addEventListener('keydown', (e) => {
   if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'o') {

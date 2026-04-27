@@ -1116,6 +1116,7 @@
     }
 
     function activateDemo() {
+      if (window.optateMount) window.optateMount();
       demoActive = true;
       const btn = document.getElementById('tryDemoBtn');
       btn.disabled = false;
@@ -1125,9 +1126,8 @@
     }
 
     function closeDemo() {
+      if (window.optateUnmount) window.optateUnmount();
       demoActive = false;
-      const host = document.getElementById('optate-host');
-      if (host) host.remove();
       const btn = document.getElementById('tryDemoBtn');
       btn.className = 'btn-primary';
       btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 5.5L10.5 8L6.5 10.5V5.5Z" fill="currentColor"/></svg> Try Live Demo`;
