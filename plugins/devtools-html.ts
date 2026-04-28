@@ -170,39 +170,6 @@ body{display:flex;flex-direction:column}
 .class-chip.other{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(235,235,245,.5)}
 .no-classes{font-size:11px;color:rgba(235,235,245,.2);font-style:italic}
 
-/* Inline style */
-#el-inline{
-  font-size:11px;font-family:'JetBrains Mono','Fira Code',monospace;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-  border-radius:7px;padding:8px 10px;color:rgba(235,235,245,.55);
-  word-break:break-all;line-height:1.6;
-}
-
-/* Source code block */
-#el-source{
-  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.07);
-  border-radius:8px;overflow:auto;max-height:300px;
-}
-#el-source::-webkit-scrollbar{width:3px;height:3px}
-#el-source::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-.source-lines{padding:10px 0;min-width:0}
-.source-line{
-  display:flex;align-items:flex-start;gap:0;padding:1px 0;
-  font-size:11px;font-family:'JetBrains Mono','Fira Code',monospace;line-height:1.65;
-  white-space:pre;
-}
-.source-line.target{background:rgba(168,85,247,.12)}
-.line-num{
-  min-width:36px;padding:0 8px;text-align:right;
-  color:rgba(235,235,245,.2);user-select:none;flex-shrink:0;
-}
-.source-line.target .line-num{color:rgba(168,85,247,.6)}
-.line-code{padding:0 12px;color:rgba(235,235,245,.7);overflow:hidden}
-.source-line.target .line-code{color:rgba(235,235,245,.95)}
-
-/* Syntax colors */
-.s-tag{color:#22d3ee}.s-attr{color:#a5f3fc}.s-str{color:#a3e635}.s-kw{color:#c084fc}
-.s-comment{color:#4b5563;font-style:italic}
 
 /* Loading / error */
 .pane-loading{display:flex;align-items:center;justify-content:center;height:60px;
@@ -639,54 +606,7 @@ function renderInfo(msg, src) {
     </div>
   \`;
 
-  if (inlineSt) {
-    html += \`
-      <div class="info-section">
-        <div class="info-label">Inline style</div>
-        <div id="el-inline">\${escHtml(inlineSt)}</div>
-      </div>
-    \`;
-  }
-
-  if (src?.context) {
-    html += \`
-      <div class="info-section">
-        <div class="info-label">Source — \${escHtml(src.file || '')}</div>
-        <div id="el-source"><div class="source-lines">\${renderSource(src)}</div></div>
-      </div>
-    \`;
-  }
-
   document.getElementById('el-info').innerHTML = html;
-}
-
-function renderSource(src) {
-  const lines = src.context.split('\\n');
-  const startLine = src.contextStart || 1;
-  return lines.map((l, i) => {
-    const ln = startLine + i;
-    const isTarget = ln === src.line;
-    return \`<div class="source-line \${isTarget ? 'target' : ''}">
-      <span class="line-num">\${ln}</span>
-      <span class="line-code">\${highlightJSX(l)}</span>
-    </div>\`;
-  }).join('');
-}
-
-function highlightJSX(line) {
-  let s = escHtml(line);
-  // Strings
-  s = s.replace(/(&quot;|&#39;)([^&]*?)\\1/g, '<span class="s-str">$1$2$1</span>');
-  // JSX opening/closing tags
-  s = s.replace(/(&lt;\\/?)([A-Z][a-zA-Z0-9]*)/g, '$1<span class="s-tag">$2</span>');
-  s = s.replace(/(&lt;\\/?)([a-z][a-zA-Z0-9-]*)/g, '$1<span class="s-tag">$2</span>');
-  // Attributes (word=)
-  s = s.replace(/\\b([a-zA-Z][a-zA-Z0-9]*)=/g, '<span class="s-attr">$1</span>=');
-  // Keywords
-  s = s.replace(/\\b(const|let|var|return|function|import|export|from|default|class|extends|if|else|for|while)\\b/g,'<span class="s-kw">$1</span>');
-  // Comments
-  s = s.replace(/(\\/\\/.*)$/, '<span class="s-comment">$1</span>');
-  return s;
 }
 
 function escHtml(s) {
