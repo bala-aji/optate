@@ -1,9 +1,10 @@
 import type { Plugin, ViteDevServer } from 'vite';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { resolve, dirname, relative, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { applyChanges, generateCursorPrompt, type EditorName } from './apply-changes.js';
+import { buildDevtoolsHtml } from './devtools-html.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = resolve(__dirname, '../dist');
@@ -35,6 +36,134 @@ export function optate(options: OptateOptions = {}): Plugin {
 
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+
+        // ── DevTools standalone page ──────────────────────────────────────
+        if (req.url === '/__optate' || req.url === '/__optate/') {
+          res.statusCode = 302;
+          res.setHeader('Location', '/__optate/devtools');
+          res.end();
+          return;
+        }
+
+        if (req.url?.startsWith('/__optate/devtools')) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.end(buildDevtoolsHtml());
+          return;
+        }
+
+        // ── Source file reader ────────────────────────────────────────────
+        if (req.url?.startsWith('/__optate/source') && req.method === 'GET') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          const urlObj = new URL(req.url, 'http://localhost');
+          const rawFile   = urlObj.searchParams.get('file')      || '';
+          const lineParam = parseInt(urlObj.searchParams.get('line') || '1', 10);
+          const component = urlObj.searchParams.get('component') || '';
+
+          const editorScheme = (() => {
+            if (existsSync(resolve(projectRoot, '.cursor')))  return 'cursor';
+            if (existsSync(resolve(projectRoot, '.zed')))     return 'zed';
+            if (existsSync(resolve(projectRoot, '.idea')))    return 'webstorm';
+            return 'vscode';
+          })();
+
+          function buildEditorUrl(absPath: string, line: number) {
+            const schemes: Record<string, string> = {
+              cursor:    `cursor://file/${absPath}:${line}`,
+              zed:       `zed://file/${absPath}:${line}`,
+              webstorm:  `webstorm://open?file=${encodeURIComponent(absPath)}&line=${line}`,
+              vscode:    `vscode://file/${absPath}:${line}`,
+            };
+            return schemes[editorScheme] ?? schemes.vscode;
+          }
+
+          function sourceResponse(absPath: string, line: number) {
+            const content = readFileSync(absPath, 'utf-8');
+            const lines = content.split('\n');
+            const ctx = 10;
+            const startIdx = Math.max(0, line - ctx - 1);
+            const endIdx   = Math.min(lines.length, line + ctx);
+            const targetLine = lines[line - 1] || '';
+            // Extract className value
+            const classMatch =
+              targetLine.match(/className=["'`]([^"'`]+)["'`]/) ||
+              targetLine.match(/class=["'`]([^"'`]+)["'`]/);
+            const classes = classMatch ? classMatch[1].split(/\s+/).filter(Boolean) : [];
+
+            return JSON.stringify({
+              file: relative(projectRoot, absPath),
+              line,
+              context: lines.slice(startIdx, endIdx).join('\n'),
+              contextStart: startIdx + 1,
+              totalLines: lines.length,
+              classes,
+              editorUrl: buildEditorUrl(absPath, line),
+            });
+          }
+
+          const SKIP = new Set(['node_modules','dist','.git','.next','build','out','.cache']);
+          function scanSrc(dir: string): string[] {
+            const out: string[] = [];
+            let entries: ReturnType<typeof readdirSync>;
+            try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+            for (const e of entries) {
+              if (SKIP.has(e.name) || e.name.startsWith('.')) continue;
+              const full = join(dir, e.name);
+              if (e.isDirectory()) out.push(...scanSrc(full));
+              else if (['.tsx','.jsx','.ts','.js'].includes(extname(e.name).toLowerCase())) out.push(full);
+            }
+            return out;
+          }
+
+          // Try absolute path first
+          if (rawFile) {
+            // Accept absolute paths (from _debugSource) or project-relative
+            let absPath = rawFile;
+            if (!existsSync(absPath)) absPath = resolve(projectRoot, rawFile.replace(/^\//, ''));
+            // Security: must be within project root
+            if (absPath.startsWith(projectRoot) && existsSync(absPath)) {
+              try {
+                res.end(sourceResponse(absPath, Math.max(1, lineParam)));
+              } catch (err: any) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: err.message }));
+              }
+              return;
+            }
+          }
+
+          // Fallback: scan for component name
+          if (component) {
+            const srcDir = resolve(projectRoot, 'src');
+            const searchDir = existsSync(srcDir) ? srcDir : projectRoot;
+            const files = scanSrc(searchDir);
+            for (const f of files) {
+              try {
+                const content = readFileSync(f, 'utf-8');
+                if (
+                  content.includes(`function ${component}`) ||
+                  content.includes(`const ${component} `) ||
+                  content.includes(`class ${component}`)
+                ) {
+                  // Find the line number of the component definition
+                  const lines = content.split('\n');
+                  const ln = lines.findIndex(l =>
+                    l.includes(`function ${component}`) ||
+                    l.includes(`const ${component} `) ||
+                    l.includes(`class ${component}`)
+                  );
+                  res.end(sourceResponse(f, ln >= 0 ? ln + 1 : 1));
+                  return;
+                }
+              } catch {}
+            }
+          }
+
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: 'Source not found' }));
+          return;
+        }
 
         // ── Serve client bundle ───────────────────────────────────────────
         if (req.url === '/__optate/client.js') {
