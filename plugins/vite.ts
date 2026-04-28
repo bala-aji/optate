@@ -35,6 +35,15 @@ export function optate(options: OptateOptions = {}): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
+      // Print DevTools URL once the server is ready
+      server.httpServer?.once('listening', () => {
+        const addr = server.httpServer?.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 5173;
+        console.log(
+          `\n  \x1b[35m[optate]\x1b[0m DevTools → \x1b[36mhttp://localhost:${port}/__optate/devtools\x1b[0m\n`
+        );
+      });
+
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
 
         // ── DevTools standalone page ──────────────────────────────────────

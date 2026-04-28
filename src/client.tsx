@@ -5,14 +5,16 @@ import styles from '../styles/content.css?inline';
 
 const HOST_ID = 'optate-host';
 
-// ── Detect DevTools preview mode ──────────────────────────────────────────────
-// When loaded inside /__optate/devtools iframe the URL has ?__optate_devtools=1
-const IS_DEVTOOLS_PREVIEW = new URLSearchParams(location.search).has('__optate_devtools');
+// ── DevTools bridge mode detection ───────────────────────────────────────────
+// Activated when:
+//   1. window.name === '__optate_devtools'  (iframe name set by devtools page, survives navigation)
+//   2. URL has ?__optate_devtools=1         (fallback / initial load)
+//   3. parent sends { type: 'optate:devtools-mode', enabled: true } postMessage
+let bridgeModeActive =
+  window.name === '__optate_devtools' ||
+  new URLSearchParams(location.search).has('__optate_devtools');
 
-// ── DevTools bridge ───────────────────────────────────────────────────────────
-// Runs instead of the normal panel when inside the devtools iframe.
-// Bridges hover/click events to the parent devtools page via postMessage.
-
+// ── React fiber helpers ───────────────────────────────────────────────────────
 function getReactFiber(el: Element): any {
   const key = Object.keys(el).find(k =>
     k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
@@ -32,9 +34,7 @@ function getDebugSource(fiber: any): { fileName: string; lineNumber: number } | 
 function getComponentName(fiber: any): string {
   let f = fiber;
   while (f) {
-    if (typeof f.type === 'function') {
-      return f.type.displayName || f.type.name || '';
-    }
+    if (typeof f.type === 'function') return f.type.displayName || f.type.name || '';
     f = f.return;
   }
   return '';
@@ -45,8 +45,8 @@ function getComponentChain(fiber: any): string[] {
   let f = fiber;
   while (f && chain.length < 6) {
     if (typeof f.type === 'function') {
-      const name = f.type.displayName || f.type.name || '';
-      if (name && !chain.includes(name)) chain.push(name);
+      const n = f.type.displayName || f.type.name || '';
+      if (n && !chain.includes(n)) chain.push(n);
     }
     f = f.return;
   }
@@ -54,45 +54,33 @@ function getComponentChain(fiber: any): string[] {
 }
 
 function sendElementInfo(event: 'hover' | 'select', el: Element) {
-  const fiber        = getReactFiber(el);
-  const debugSource  = getDebugSource(fiber);
-  const componentName = getComponentName(fiber);
-  const componentChain = getComponentChain(fiber);
-  const rect = el.getBoundingClientRect().toJSON();
-  const label = componentName || el.tagName.toLowerCase();
-
+  const fiber = getReactFiber(el);
   window.parent.postMessage({
     type: 'optate:element',
     event,
-    tagName:       el.tagName.toLowerCase(),
-    id:            el.id || '',
-    classList:     Array.from(el.classList),
-    inlineStyle:   (el as HTMLElement).style?.cssText || '',
-    componentName,
-    componentChain,
-    debugSource,
-    rect,
-    label,
+    tagName:        el.tagName.toLowerCase(),
+    id:             el.id || '',
+    classList:      Array.from(el.classList),
+    inlineStyle:    (el as HTMLElement).style?.cssText || '',
+    componentName:  getComponentName(fiber),
+    componentChain: getComponentChain(fiber),
+    debugSource:    getDebugSource(fiber),
+    rect:           el.getBoundingClientRect().toJSON(),
+    label:          getComponentName(fiber) || el.tagName.toLowerCase(),
   }, '*');
 }
 
-function setupDevtoolsBridge() {
-  let inspectEnabled = true;
+// ── Bridge listeners (set up once, checked via bridgeModeActive flag) ─────────
+let bridgeListenersAttached = false;
+
+function attachBridgeListeners() {
+  if (bridgeListenersAttached) return;
+  bridgeListenersAttached = true;
+
   let lastHovered: Element | null = null;
 
-  // Listen for inspect-mode toggle from devtools parent
-  window.addEventListener('message', (e) => {
-    if (e.data?.type === 'optate:inspect-mode') {
-      inspectEnabled = e.data.enabled;
-      if (!inspectEnabled) {
-        // Clear hover
-        window.parent.postMessage({ type: 'optate:element', event: 'hover', rect: null }, '*');
-      }
-    }
-  });
-
   document.addEventListener('mouseover', (e) => {
-    if (!inspectEnabled) return;
+    if (!bridgeModeActive) return;
     const el = e.target as Element;
     if (el === lastHovered) return;
     lastHovered = el;
@@ -100,34 +88,55 @@ function setupDevtoolsBridge() {
   }, true);
 
   document.addEventListener('mouseout', (e) => {
-    if (!inspectEnabled) return;
-    const el = e.target as Element;
-    if (el === lastHovered) {
+    if (!bridgeModeActive) return;
+    if (e.target === lastHovered) {
       lastHovered = null;
       window.parent.postMessage({ type: 'optate:element', event: 'hover', rect: null, label: '' }, '*');
     }
   }, true);
 
   document.addEventListener('click', (e) => {
-    if (!inspectEnabled) return;
+    if (!bridgeModeActive) return;
     e.preventDefault();
     e.stopPropagation();
     sendElementInfo('select', e.target as Element);
   }, true);
 }
 
+// ── postMessage listener — devtools parent activates/deactivates bridge ────────
+window.addEventListener('message', (e) => {
+  if (e.data?.type === 'optate:devtools-mode') {
+    const enable = !!e.data.enabled;
+
+    if (enable && !bridgeModeActive) {
+      bridgeModeActive = true;
+      // Unmount the panel if it was already mounted
+      unmount();
+      attachBridgeListeners();
+      // Confirm back to devtools
+      window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
+    } else if (!enable && bridgeModeActive) {
+      bridgeModeActive = false;
+      // Re-mount the panel
+      mount();
+    }
+  }
+  if (e.data?.type === 'optate:inspect-mode') {
+    // Handled by bridge listener gate (bridgeModeActive already set)
+  }
+});
+
 // ── Normal panel mount/unmount ────────────────────────────────────────────────
 function mount() {
-  // Don't mount panel when running inside devtools iframe
-  if (IS_DEVTOOLS_PREVIEW) return;
-  if (window.self !== window.top) return;
+  if (bridgeModeActive) return;          // never mount in bridge mode
+  if (window.self !== window.top) return; // never mount inside iframes
   if (document.getElementById(HOST_ID)) return;
 
   if (!document.querySelector('#optate-font-inter')) {
     const link = document.createElement('link');
-    link.id    = 'optate-font-inter';
-    link.rel   = 'stylesheet';
-    link.href  = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+    link.id   = 'optate-font-inter';
+    link.rel  = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
     document.head.appendChild(link);
   }
 
@@ -136,7 +145,6 @@ function mount() {
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
-
   const styleEl = document.createElement('style');
   styleEl.textContent = styles;
   shadow.appendChild(styleEl);
@@ -148,10 +156,7 @@ function mount() {
   root.render(
     <SelectionProvider>
       <PanelShell
-        onClose={() => {
-          root.unmount();
-          host.remove();
-        }}
+        onClose={() => { root.unmount(); host.remove(); }}
         initiallyOpen={true}
       />
     </SelectionProvider>
@@ -163,20 +168,24 @@ function unmount() {
   if (host) host.remove();
 }
 
-// Expose mount/unmount globally
+// Expose globally
 (window as any).optateMount   = mount;
 (window as any).optateUnmount = unmount;
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-if (IS_DEVTOOLS_PREVIEW) {
-  // DevTools bridge mode — run as soon as DOM is ready
+if (bridgeModeActive) {
+  // Start in bridge mode immediately
+  attachBridgeListeners();
+  // Tell the devtools parent we're ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupDevtoolsBridge);
+    document.addEventListener('DOMContentLoaded', () => {
+      window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
+    });
   } else {
-    setupDevtoolsBridge();
+    window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
   }
 } else {
-  // Normal mode — toggle via keyboard: Alt+Shift+O
+  // Normal mode — keyboard shortcut Alt+Shift+O
   window.addEventListener('keydown', (e) => {
     if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'o') {
       document.getElementById(HOST_ID) ? unmount() : mount();

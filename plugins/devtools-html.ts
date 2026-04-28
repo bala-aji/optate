@@ -257,7 +257,7 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
   <div id="preview-wrap">
     <div id="preview-inner">
       <canvas id="hover-overlay"></canvas>
-      <iframe id="previewFrame" class="desktop" src="/?__optate_devtools=1" allow="same-origin"></iframe>
+      <iframe id="previewFrame" class="desktop" name="__optate_devtools" src="/" allow="same-origin"></iframe>
     </div>
   </div>
 
@@ -305,20 +305,28 @@ const urlBar = document.getElementById('urlBar');
 
 document.getElementById('goBtn').addEventListener('click', navigate);
 urlBar.addEventListener('keydown', e => { if (e.key === 'Enter') navigate(); });
-document.getElementById('reloadBtn').addEventListener('click', () => frame.contentWindow?.location.reload());
+document.getElementById('reloadBtn').addEventListener('click', () => {
+  frame.contentWindow?.location.reload();
+});
 
 function navigate() {
   let url = urlBar.value.trim() || '/';
   if (!url.startsWith('/')) url = '/' + url;
-  const sep = url.includes('?') ? '&' : '?';
-  frame.src = url + sep + '__optate_devtools=1';
+  frame.src = url;
 }
 
+// Every time the iframe finishes loading, activate bridge mode via postMessage.
+// This handles: initial load, in-app navigation, manual reloads.
 frame.addEventListener('load', () => {
+  // Activate bridge mode — window.name is already "__optate_devtools"
+  // but send postMessage too as belt-and-suspenders
+  try {
+    frame.contentWindow.postMessage({ type: 'optate:devtools-mode', enabled: true }, '*');
+  } catch {}
+  // Update URL bar
   try {
     const loc = frame.contentWindow.location;
-    let path = loc.pathname + (loc.search ? loc.search.replace('?__optate_devtools=1','').replace('&__optate_devtools=1','') : '');
-    urlBar.value = path || '/';
+    urlBar.value = loc.pathname + (loc.search || '') + (loc.hash || '') || '/';
   } catch {}
 });
 
