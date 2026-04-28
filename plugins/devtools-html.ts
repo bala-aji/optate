@@ -189,29 +189,51 @@ body{display:flex;flex-direction:column}
   color:rgba(168,85,247,1)!important;
 }
 
-/* Standalone banner (shown in normal tab, hidden in popup) */
-#standalone-banner{
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  padding:8px 16px;
-  background:rgba(168,85,247,.07);
-  border-bottom:1px solid rgba(168,85,247,.15);
-  font-size:11.5px;color:rgba(168,85,247,.7);
-  flex-shrink:0;
+/* Redirect screen — shown in the original tab after popup opens */
+#redirect-screen{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:#0a0a0b;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;
 }
-#standalone-banner b{font-weight:600;color:rgba(168,85,247,.9)}
-#standalone-banner button{
+.rs-icon{
+  width:56px;height:56px;border-radius:14px;
+  background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.25);
+  display:flex;align-items:center;justify-content:center;
+}
+.rs-title{font-size:17px;font-weight:600;color:rgba(235,235,245,.9);margin-top:4px}
+.rs-sub{font-size:13px;color:rgba(235,235,245,.35);text-align:center;line-height:1.6}
+.rs-actions{display:flex;gap:10px;margin-top:4px}
+.rs-btn{
+  padding:7px 18px;border-radius:8px;font-size:13px;font-weight:500;
+  cursor:pointer;font-family:inherit;transition:all .15s;border:none;
+}
+.rs-btn-primary{
+  background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.35);
+  color:rgba(168,85,247,.9);
+}
+.rs-btn-primary:hover{background:rgba(168,85,247,.3)}
+.rs-btn-ghost{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+  color:rgba(235,235,245,.4);
+}
+.rs-btn-ghost:hover{background:rgba(255,255,255,.08);color:rgba(235,235,245,.7)}
+
+/* Popup-blocked fallback banner */
+#blocked-banner{
+  display:none;align-items:center;justify-content:center;gap:10px;
+  padding:8px 16px;
+  background:rgba(168,85,247,.07);border-bottom:1px solid rgba(168,85,247,.15);
+  font-size:11.5px;color:rgba(168,85,247,.7);flex-shrink:0;
+}
+#blocked-banner button{
   display:flex;align-items:center;gap:5px;
   padding:3px 10px;background:rgba(168,85,247,.15);
   border:1px solid rgba(168,85,247,.3);border-radius:5px;
   color:rgba(168,85,247,.9);font-size:11px;font-weight:500;
-  cursor:pointer;font-family:inherit;transition:all .12s;
+  cursor:pointer;font-family:inherit;
 }
-#standalone-banner button:hover{background:rgba(168,85,247,.25)}
-#standalone-banner .dismiss{
-  margin-left:4px;background:transparent;border:none;
-  color:rgba(168,85,247,.4);font-size:13px;cursor:pointer;padding:0 4px;line-height:1;
-}
-#standalone-banner .dismiss:hover{color:rgba(168,85,247,.7)}
+#blocked-banner button:hover{background:rgba(168,85,247,.25)}
 </style>
 </head>
 <body>
@@ -261,19 +283,28 @@ body{display:flex;flex-direction:column}
   </button>
 </div>
 
-<!-- Standalone banner (only visible in regular tab, not in popup) -->
-<div id="standalone-banner">
+<!-- Redirect screen (shown in original tab after popup auto-opens) -->
+<div id="redirect-screen">
+  <div class="rs-icon">
+    <svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="rgba(168,85,247,.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="4" width="10" height="10" rx="1.5"/><path d="M7 1h8v8M10 1h5v5"/>
+    </svg>
+  </div>
+  <div class="rs-title">DevTools opened in standalone window</div>
+  <div class="rs-sub">The DevTools are running in a separate window<br/>without browser UI for a cleaner experience.</div>
+  <div class="rs-actions">
+    <button class="rs-btn rs-btn-primary" onclick="reopenStandalone()">Reopen standalone</button>
+    <button class="rs-btn rs-btn-ghost" onclick="window.close()">Close this tab</button>
+  </div>
+</div>
+
+<!-- Popup-blocked fallback banner -->
+<div id="blocked-banner">
   <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(168,85,247,.7)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <rect x="1" y="4" width="10" height="10" rx="1.5"/><path d="M7 1h8v8M10 1h5v5"/>
   </svg>
-  For the best experience, open DevTools <b>without browser UI</b>
-  <button onclick="openStandalone()">
-    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="1" y="4" width="10" height="10" rx="1.5"/><path d="M7 1h8v8M10 1h5v5"/>
-    </svg>
-    Open standalone
-  </button>
-  <button class="dismiss" onclick="dismissBanner()" title="Dismiss">✕</button>
+  Popup was blocked — click to open DevTools without browser UI
+  <button onclick="openStandalone()">Open standalone</button>
 </div>
 
 <!-- Main layout -->
@@ -323,40 +354,51 @@ body{display:flex;flex-direction:column}
 // ── Standalone popup ──────────────────────────────────────────────────────────
 const IS_POPUP = window.opener !== null || new URLSearchParams(location.search).has('_pop');
 
-function openStandalone() {
+function _doOpen() {
   const sw = screen.availWidth  || window.screen.width;
   const sh = screen.availHeight || window.screen.height;
   const sl = screen.availLeft   || 0;
   const st = screen.availTop    || 0;
   const url = location.origin + location.pathname + '?_pop=1';
-  const win = window.open(url, 'optate_devtools_standalone',
+  return window.open(url, 'optate_devtools_standalone',
     'popup=1,resizable=yes' +
     ',width='  + sw +
     ',height=' + sh +
     ',left='   + sl +
     ',top='    + st
   );
-  if (win) win.focus();
 }
 
-function dismissBanner() {
-  const b = document.getElementById('standalone-banner');
-  if (b) { b.style.display = 'none'; sessionStorage.setItem('optate-banner-dismissed','1'); }
-}
+function openStandalone()   { const w = _doOpen(); if (w) w.focus(); }
+function reopenStandalone() { const w = _doOpen(); if (w) w.focus(); }
 
-// Hide banner when already in a popup or previously dismissed
-(function() {
-  const b = document.getElementById('standalone-banner');
-  if (!b) return;
-  if (IS_POPUP || sessionStorage.getItem('optate-banner-dismissed')) {
-    b.style.display = 'none';
-  }
-  // Also hide the toolbar pop-out button when in popup
+// ── Auto-open: always launch as standalone on a regular tab visit ─────────────
+(function autoOpen() {
   if (IS_POPUP) {
+    // Already standalone — hide pop-out button (redundant in popup)
     const btn = document.getElementById('popOutBtn');
     const sep = document.getElementById('popout-sep');
     if (btn) btn.style.display = 'none';
     if (sep) sep.style.display = 'none';
+    return;
+  }
+
+  // Regular tab → try to auto-open popup
+  const popup = _doOpen();
+  const toolbar  = document.getElementById('toolbar');
+  const layout   = document.getElementById('layout');
+  const redirect = document.getElementById('redirect-screen');
+  const blocked  = document.getElementById('blocked-banner');
+
+  if (popup) {
+    // Success — show redirect screen, hide the DevTools UI
+    popup.focus();
+    if (toolbar)  toolbar.style.display  = 'none';
+    if (layout)   layout.style.display   = 'none';
+    if (redirect) redirect.style.display = 'flex';
+  } else {
+    // Popup blocked — fall back to banner so user can click manually
+    if (blocked) blocked.style.display = 'flex';
   }
 })();
 
