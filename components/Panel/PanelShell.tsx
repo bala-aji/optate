@@ -432,6 +432,18 @@ export const PanelShell: React.FC<PanelShellProps> = ({
             </span>
           </ToolbarButton>
 
+          {/* Layers toggle */}
+          <ToolbarButton
+            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+            active={isLeftPanelOpen}
+            tooltip={isLeftPanelOpen ? 'Hide Inspector' : 'Show Inspector'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="2" width="5" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M9 5h5M9 8h4M9 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </ToolbarButton>
+
           <ToolbarDivider />
 
           {/* Undo */}

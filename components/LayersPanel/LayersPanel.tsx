@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, X, ExternalLink, Copy, Check } from 'lucide-react';
 import { DOMTreeNode } from './DOMTreeNode';
 import { useSelection } from '@/lib/selection-context';
@@ -52,7 +52,7 @@ function isTailwind(cls: string) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const LayersPanel: React.FC = () => {
-  const { isLeftPanelOpen, searchQuery, setSearchQuery } = useSelection();
+  const { isLeftPanelOpen, setIsLeftPanelOpen, searchQuery, setSearchQuery } = useSelection();
 
   // Never show inside the DevTools preview iframe
   if (typeof window !== 'undefined' && window.name === '__optate_devtools') return null;
@@ -99,7 +99,35 @@ export const LayersPanel: React.FC = () => {
           }}>
             Inspector
           </span>
-          <NodeCountBadge />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <NodeCountBadge />
+            {/* Close button */}
+            <div
+              onClick={() => setIsLeftPanelOpen(false)}
+              title="Close panel"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                color: 'rgba(100,116,139,0.5)',
+                transition: 'background 0.1s, color 0.1s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)';
+                (e.currentTarget as HTMLDivElement).style.color = 'rgba(255,255,255,0.7)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                (e.currentTarget as HTMLDivElement).style.color = 'rgba(100,116,139,0.5)';
+              }}
+            >
+              <X size={12} />
+            </div>
+          </div>
         </div>
 
         {/* Search */}
