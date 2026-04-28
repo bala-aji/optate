@@ -44,7 +44,8 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
 .viewport-btns{display:flex;gap:4px}
 
 /* ── Layout ── */
-#layout{display:flex;height:calc(100vh - 42px);overflow:hidden}
+#layout{display:flex;flex:1;overflow:hidden;min-height:0}
+body{display:flex;flex-direction:column}
 
 /* ── Preview pane ── */
 #preview-wrap{
@@ -209,6 +210,41 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
 .spinner{width:14px;height:14px;border:2px solid rgba(168,85,247,.3);
   border-top-color:rgba(168,85,247,.8);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Pop-out button */
+.tb-btn-popout{
+  background:rgba(168,85,247,.1)!important;
+  border-color:rgba(168,85,247,.25)!important;
+  color:rgba(168,85,247,.85)!important;
+}
+.tb-btn-popout:hover{
+  background:rgba(168,85,247,.2)!important;
+  color:rgba(168,85,247,1)!important;
+}
+
+/* Standalone banner (shown in normal tab, hidden in popup) */
+#standalone-banner{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:8px 16px;
+  background:rgba(168,85,247,.07);
+  border-bottom:1px solid rgba(168,85,247,.15);
+  font-size:11.5px;color:rgba(168,85,247,.7);
+  flex-shrink:0;
+}
+#standalone-banner b{font-weight:600;color:rgba(168,85,247,.9)}
+#standalone-banner button{
+  display:flex;align-items:center;gap:5px;
+  padding:3px 10px;background:rgba(168,85,247,.15);
+  border:1px solid rgba(168,85,247,.3);border-radius:5px;
+  color:rgba(168,85,247,.9);font-size:11px;font-weight:500;
+  cursor:pointer;font-family:inherit;transition:all .12s;
+}
+#standalone-banner button:hover{background:rgba(168,85,247,.25)}
+#standalone-banner .dismiss{
+  margin-left:4px;background:transparent;border:none;
+  color:rgba(168,85,247,.4);font-size:13px;cursor:pointer;padding:0 4px;line-height:1;
+}
+#standalone-banner .dismiss:hover{color:rgba(168,85,247,.7)}
 </style>
 </head>
 <body>
@@ -248,6 +284,29 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M10 10l4 4"/></svg>
     Inspect
   </button>
+  <div class="tb-sep" id="popout-sep"></div>
+  <button class="tb-btn tb-btn-popout" id="popOutBtn" title="Open as standalone window (no browser UI)">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="4" width="10" height="10" rx="1.5"/>
+      <path d="M7 1h8v8M10 1h5v5"/>
+    </svg>
+    Pop out
+  </button>
+</div>
+
+<!-- Standalone banner (only visible in regular tab, not in popup) -->
+<div id="standalone-banner">
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(168,85,247,.7)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1" y="4" width="10" height="10" rx="1.5"/><path d="M7 1h8v8M10 1h5v5"/>
+  </svg>
+  For the best experience, open DevTools <b>without browser UI</b>
+  <button onclick="openStandalone()">
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="4" width="10" height="10" rx="1.5"/><path d="M7 1h8v8M10 1h5v5"/>
+    </svg>
+    Open standalone
+  </button>
+  <button class="dismiss" onclick="dismissBanner()" title="Dismiss">✕</button>
 </div>
 
 <!-- Main layout -->
@@ -294,6 +353,46 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
 </div>
 
 <script>
+// ── Standalone popup ──────────────────────────────────────────────────────────
+const IS_POPUP = window.opener !== null || new URLSearchParams(location.search).has('_pop');
+
+function openStandalone() {
+  const sw = screen.availWidth  || window.screen.width;
+  const sh = screen.availHeight || window.screen.height;
+  const sl = screen.availLeft   || 0;
+  const st = screen.availTop    || 0;
+  const url = location.origin + location.pathname + '?_pop=1';
+  const win = window.open(url, 'optate_devtools_standalone',
+    'popup=1,resizable=yes' +
+    ',width='  + sw +
+    ',height=' + sh +
+    ',left='   + sl +
+    ',top='    + st
+  );
+  if (win) win.focus();
+}
+
+function dismissBanner() {
+  const b = document.getElementById('standalone-banner');
+  if (b) { b.style.display = 'none'; sessionStorage.setItem('optate-banner-dismissed','1'); }
+}
+
+// Hide banner when already in a popup or previously dismissed
+(function() {
+  const b = document.getElementById('standalone-banner');
+  if (!b) return;
+  if (IS_POPUP || sessionStorage.getItem('optate-banner-dismissed')) {
+    b.style.display = 'none';
+  }
+  // Also hide the toolbar pop-out button when in popup
+  if (IS_POPUP) {
+    const btn = document.getElementById('popOutBtn');
+    const sep = document.getElementById('popout-sep');
+    if (btn) btn.style.display = 'none';
+    if (sep) sep.style.display = 'none';
+  }
+})();
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let selectedEl = null;
 let inspectMode = false;

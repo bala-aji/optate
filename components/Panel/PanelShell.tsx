@@ -311,6 +311,7 @@ export const PanelShell: React.FC<PanelShellProps> = ({
       <ElementSelector />
       <ElementHighlighter />
       <EditorPanel />
+      <LayersPanel />
 
       {/* Bottom Toolbar */}
       <div
