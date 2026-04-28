@@ -5,12 +5,15 @@ import styles from '../styles/content.css?inline';
 
 const HOST_ID = 'optate-host';
 
-// ── DevTools bridge mode detection ───────────────────────────────────────────
-// Activated when:
-//   1. window.name === '__optate_devtools'  (iframe name set by devtools page, survives navigation)
-//   2. URL has ?__optate_devtools=1         (fallback / initial load)
-//   3. parent sends { type: 'optate:devtools-mode', enabled: true } postMessage
-let bridgeModeActive =
+// ── DevTools augmented mode detection ────────────────────────────────────────
+// When running inside the /__optate/devtools iframe:
+//   - The Optate editor panel mounts NORMALLY (editing still works)
+//   - Additionally: hover/click events are bridged to the devtools right pane
+//     via postMessage so the source inspector can update in real time
+//
+// Detection: window.name === '__optate_devtools' (set on the iframe element,
+// persists across all in-app navigations) or postMessage activation.
+let devtoolsAugmented =
   window.name === '__optate_devtools' ||
   new URLSearchParams(location.search).has('__optate_devtools');
 
@@ -54,6 +57,7 @@ function getComponentChain(fiber: any): string[] {
 }
 
 function sendElementInfo(event: 'hover' | 'select', el: Element) {
+  if (window.parent === window) return; // not in an iframe
   const fiber = getReactFiber(el);
   window.parent.postMessage({
     type: 'optate:element',
@@ -70,7 +74,8 @@ function sendElementInfo(event: 'hover' | 'select', el: Element) {
   }, '*');
 }
 
-// ── Bridge listeners (set up once, checked via bridgeModeActive flag) ─────────
+// ── Augmented bridge listeners ────────────────────────────────────────────────
+// These run alongside the normal panel — they only add postMessage side-effects.
 let bridgeListenersAttached = false;
 
 function attachBridgeListeners() {
@@ -79,8 +84,9 @@ function attachBridgeListeners() {
 
   let lastHovered: Element | null = null;
 
+  // Hover → update devtools overlay + right pane preview
   document.addEventListener('mouseover', (e) => {
-    if (!bridgeModeActive) return;
+    if (!devtoolsAugmented) return;
     const el = e.target as Element;
     if (el === lastHovered) return;
     lastHovered = el;
@@ -88,48 +94,40 @@ function attachBridgeListeners() {
   }, true);
 
   document.addEventListener('mouseout', (e) => {
-    if (!bridgeModeActive) return;
+    if (!devtoolsAugmented) return;
     if (e.target === lastHovered) {
       lastHovered = null;
       window.parent.postMessage({ type: 'optate:element', event: 'hover', rect: null, label: '' }, '*');
     }
   }, true);
 
+  // Click → update devtools source panel (but DON'T preventDefault — panel works normally)
   document.addEventListener('click', (e) => {
-    if (!bridgeModeActive) return;
-    e.preventDefault();
-    e.stopPropagation();
+    if (!devtoolsAugmented) return;
     sendElementInfo('select', e.target as Element);
   }, true);
 }
 
-// ── postMessage listener — devtools parent activates/deactivates bridge ────────
+// ── postMessage listener — devtools parent activates augmented mode ───────────
 window.addEventListener('message', (e) => {
   if (e.data?.type === 'optate:devtools-mode') {
-    const enable = !!e.data.enabled;
-
-    if (enable && !bridgeModeActive) {
-      bridgeModeActive = true;
-      // Unmount the panel if it was already mounted
-      unmount();
+    if (e.data.enabled && !devtoolsAugmented) {
+      devtoolsAugmented = true;
       attachBridgeListeners();
-      // Confirm back to devtools
-      window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
-    } else if (!enable && bridgeModeActive) {
-      bridgeModeActive = false;
-      // Re-mount the panel
-      mount();
+    } else if (!e.data.enabled) {
+      devtoolsAugmented = false;
     }
-  }
-  if (e.data?.type === 'optate:inspect-mode') {
-    // Handled by bridge listener gate (bridgeModeActive already set)
+    // Confirm ready
+    if (e.data.enabled) {
+      window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
+    }
   }
 });
 
 // ── Normal panel mount/unmount ────────────────────────────────────────────────
 function mount() {
-  if (bridgeModeActive) return;          // never mount in bridge mode
-  if (window.self !== window.top) return; // never mount inside iframes
+  // Allow mounting in the devtools iframe; block all other iframes
+  if (!devtoolsAugmented && window.self !== window.top) return;
   if (document.getElementById(HOST_ID)) return;
 
   if (!document.querySelector('#optate-font-inter')) {
@@ -168,33 +166,29 @@ function unmount() {
   if (host) host.remove();
 }
 
-// Expose globally
 (window as any).optateMount   = mount;
 (window as any).optateUnmount = unmount;
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-if (bridgeModeActive) {
-  // Start in bridge mode immediately
+if (devtoolsAugmented) {
+  // Inside devtools iframe: mount the panel normally AND attach bridge listeners
+  // so the right pane inspector updates as you interact with elements
   attachBridgeListeners();
-  // Tell the devtools parent we're ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
-    });
-  } else {
+  const boot = () => {
+    mount();
     window.parent.postMessage({ type: 'optate:bridge-ready' }, '*');
-  }
+  };
+  document.readyState === 'loading'
+    ? document.addEventListener('DOMContentLoaded', boot)
+    : boot();
 } else {
-  // Normal mode — keyboard shortcut Alt+Shift+O
+  // Normal top-level mode
   window.addEventListener('keydown', (e) => {
     if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'o') {
       document.getElementById(HOST_ID) ? unmount() : mount();
     }
   });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
-  } else {
-    mount();
-  }
+  document.readyState === 'loading'
+    ? document.addEventListener('DOMContentLoaded', mount)
+    : mount();
 }
