@@ -37,24 +37,26 @@ export interface ApplyResult {
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-export type EditorName = 'vscode' | 'cursor' | 'zed' | 'webstorm' | 'sublime' | 'textmate' | 'auto';
+export type EditorName = 'vscode' | 'cursor' | 'zed' | 'webstorm' | 'sublime' | 'textmate' | 'antigravity' | 'auto';
 
 /** URL builder per editor */
 const EDITOR_URL: Record<Exclude<EditorName, 'auto'>, (path: string, line: number) => string> = {
-  vscode:    (p, l) => `vscode://file/${p}:${l}`,
-  cursor:    (p, l) => `cursor://file/${p}:${l}`,
-  zed:       (p, l) => `zed://file/${p}:${l}`,
-  webstorm:  (p, l) => `webstorm://open?file=${encodeURIComponent(p)}&line=${l}`,
-  sublime:   (p, l) => `subl://open?url=file://${encodeURIComponent(p)}&line=${l}`,
-  textmate:  (p, l) => `txmt://open?url=file://${encodeURIComponent(p)}&line=${l}`,
+  vscode:      (p, l) => `vscode://file/${p}:${l}`,
+  cursor:      (p, l) => `cursor://file/${p}:${l}`,
+  zed:         (p, l) => `zed://file/${p}:${l}`,
+  webstorm:    (p, l) => `webstorm://open?file=${encodeURIComponent(p)}&line=${l}`,
+  sublime:     (p, l) => `subl://open?url=file://${encodeURIComponent(p)}&line=${l}`,
+  textmate:    (p, l) => `txmt://open?url=file://${encodeURIComponent(p)}&line=${l}`,
+  antigravity: (p, l) => `antigravity://open?file=${encodeURIComponent(p)}&line=${l}`,
 };
 
 /** Auto-detect editor from config folders present in the project root */
 function autoDetectEditor(projectRoot: string): Exclude<EditorName, 'auto'> {
-  if (existsSync(resolve(projectRoot, '.cursor')))  return 'cursor';
-  if (existsSync(resolve(projectRoot, '.zed')))     return 'zed';
-  if (existsSync(resolve(projectRoot, '.idea')))    return 'webstorm';
-  if (existsSync(resolve(projectRoot, '.vscode')))  return 'vscode';
+  if (existsSync(resolve(projectRoot, '.antigravity'))) return 'antigravity';
+  if (existsSync(resolve(projectRoot, '.cursor')))      return 'cursor';
+  if (existsSync(resolve(projectRoot, '.zed')))         return 'zed';
+  if (existsSync(resolve(projectRoot, '.idea')))        return 'webstorm';
+  if (existsSync(resolve(projectRoot, '.vscode')))      return 'vscode';
   return 'vscode'; // safe default
 }
 

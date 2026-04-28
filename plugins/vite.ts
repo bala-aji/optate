@@ -19,7 +19,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 export interface OptateOptions {
-  /** Force a specific editor for file deep-links. Default: auto-detect from .cursor/.vscode/.zed/.idea */
+  /** Force a specific editor for file deep-links. Default: auto-detect from .antigravity/.cursor/.vscode/.zed/.idea */
   editor?: EditorName;
 }
 
@@ -71,18 +71,24 @@ export function optate(options: OptateOptions = {}): Plugin {
           const component = urlObj.searchParams.get('component') || '';
 
           const editorScheme = (() => {
-            if (existsSync(resolve(projectRoot, '.cursor')))  return 'cursor';
-            if (existsSync(resolve(projectRoot, '.zed')))     return 'zed';
-            if (existsSync(resolve(projectRoot, '.idea')))    return 'webstorm';
+            if (options.editor && options.editor !== 'auto') return options.editor;
+            if (existsSync(resolve(projectRoot, '.antigravity'))) return 'antigravity';
+            if (existsSync(resolve(projectRoot, '.cursor')))      return 'cursor';
+            if (existsSync(resolve(projectRoot, '.zed')))         return 'zed';
+            if (existsSync(resolve(projectRoot, '.idea')))        return 'webstorm';
+            if (existsSync(resolve(projectRoot, '.vscode')))      return 'vscode';
             return 'vscode';
           })();
 
           function buildEditorUrl(absPath: string, line: number) {
             const schemes: Record<string, string> = {
-              cursor:    `cursor://file/${absPath}:${line}`,
-              zed:       `zed://file/${absPath}:${line}`,
-              webstorm:  `webstorm://open?file=${encodeURIComponent(absPath)}&line=${line}`,
-              vscode:    `vscode://file/${absPath}:${line}`,
+              antigravity: `antigravity://open?file=${encodeURIComponent(absPath)}&line=${line}`,
+              cursor:      `cursor://file/${absPath}:${line}`,
+              zed:         `zed://file/${absPath}:${line}`,
+              webstorm:    `webstorm://open?file=${encodeURIComponent(absPath)}&line=${line}`,
+              sublime:     `subl://open?url=file://${encodeURIComponent(absPath)}&line=${line}`,
+              textmate:    `txmt://open?url=file://${encodeURIComponent(absPath)}&line=${line}`,
+              vscode:      `vscode://file/${absPath}:${line}`,
             };
             return schemes[editorScheme] ?? schemes.vscode;
           }
