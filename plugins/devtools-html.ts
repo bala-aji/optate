@@ -305,6 +305,12 @@ function reopenStandalone() { const w = _doOpen(); if (w) w.focus(); }
   }
 })();
 
+// ── Service worker registration (required for PWA install prompt) ─────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/__optate/sw.js', { scope: '/__optate/' })
+    .catch(() => {});
+}
+
 // ── PWA Install ───────────────────────────────────────────────────────────────
 let _installPrompt = null;
 

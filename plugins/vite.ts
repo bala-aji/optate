@@ -40,7 +40,7 @@ export function optate(options: OptateOptions = {}): Plugin {
         const addr = server.httpServer?.address();
         const port = typeof addr === 'object' && addr ? addr.port : 5173;
         console.log(
-          `\n  \x1b[35m[optate]\x1b[0m DevTools → \x1b[36mhttp://localhost:${port}/__optate/devtools\x1b[0m\n`
+          `\n  \x1b[35m[optate]\x1b[0m DevTools → \x1b[36mhttp://localhost:${port}/__optate/devtools?_pop=1\x1b[0m\n`
         );
       });
 
@@ -60,7 +60,7 @@ export function optate(options: OptateOptions = {}): Plugin {
           return;
         }
 
-        // ── PWA manifest (makes DevTools installable as standalone app) ───
+        // ── PWA manifest ─────────────────────────────────────────────────
         if (req.url === '/__optate/manifest.json') {
           res.setHeader('Content-Type', 'application/manifest+json');
           res.setHeader('Access-Control-Allow-Origin', '*');
@@ -74,10 +74,35 @@ export function optate(options: OptateOptions = {}): Plugin {
             background_color: '#0a0a0b',
             theme_color: '#0a0a0b',
             icons: [
-              { src: '/__optate/icon-192.png', sizes: '192x192', type: 'image/png' },
-              { src: '/__optate/icon-512.png', sizes: '512x512', type: 'image/png' },
+              { src: '/__optate/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
             ],
           }, null, 2));
+          return;
+        }
+
+        // ── PWA icon (SVG, accepted by Chrome 93+) ────────────────────────
+        if (req.url === '/__optate/icon.svg') {
+          res.setHeader('Content-Type', 'image/svg+xml');
+          res.setHeader('Cache-Control', 'public,max-age=86400');
+          res.end(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+            <rect width="192" height="192" rx="42" fill="#0a0a0b"/>
+            <rect width="192" height="192" rx="42" fill="rgba(168,85,247,0.15)"/>
+            <rect x="8" y="8" width="176" height="176" rx="36" stroke="rgba(168,85,247,0.4)" stroke-width="2" fill="none"/>
+            <path d="M60 96h72M96 60v72" stroke="rgba(168,85,247,0.9)" stroke-width="12" stroke-linecap="round"/>
+          </svg>`);
+          return;
+        }
+
+        // ── PWA service worker (required for beforeinstallprompt to fire) ─
+        if (req.url === '/__optate/sw.js') {
+          res.setHeader('Content-Type', 'application/javascript');
+          res.setHeader('Service-Worker-Allowed', '/__optate/');
+          res.end(`
+// Optate DevTools service worker — minimal, no caching
+self.addEventListener('install',  () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+self.addEventListener('fetch',    (e) => e.respondWith(fetch(e.request)));
+          `.trim());
           return;
         }
 
