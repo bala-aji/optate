@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelection } from '@/lib/selection-context';
-import { rgbToHex } from '@/lib/css-utils';
 
 interface BoxRect {
   top: number;
@@ -44,7 +43,7 @@ function getElementInfo(el: HTMLElement): ElementInfo {
 }
 
 export const ElementHighlighter: React.FC = () => {
-  const { hoveredElement, selectedElement, isInspecting, isEditing, setIsEditing } = useSelection();
+  const { hoveredElement, selectedElement, isInspecting } = useSelection();
 
   const [hoverRect, setHoverRect] = useState<BoxRect | null>(null);
   const [selectRect, setSelectRect] = useState<BoxRect | null>(null);
@@ -104,30 +103,11 @@ export const ElementHighlighter: React.FC = () => {
     }
   }, [selectedElement]);
 
-  // Tooltip position calculation
-  const getTooltipStyle = (rect: BoxRect): React.CSSProperties => {
-    const tooltipWidth = 220;
-    const tooltipHeight = 140;
-    let top = rect.top + rect.height + 8;
-    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
-
-    if (top + tooltipHeight > window.innerHeight - 80) {
-      top = rect.top - tooltipHeight - 8;
-    }
-    if (left < 8) left = 8;
-    if (left + tooltipWidth > window.innerWidth - 8) left = window.innerWidth - tooltipWidth - 8;
-
-    return { top: `${top}px`, left: `${left}px`, width: `${tooltipWidth}px` };
-  };
-
-  const handleEditClick = () => {
-    setIsEditing(true);
-  };
 
   return (
     <>
-      {/* Hover Highlight — green dashed border */}
-      {isInspecting && hoverRect && hoveredElement !== selectedElement && (
+      {/* Hover Highlight — pink dashed border + label */}
+      {isInspecting && hoverRect && hoverInfo && hoveredElement !== selectedElement && (
         <div
           style={{
             position: 'fixed',
@@ -135,16 +115,26 @@ export const ElementHighlighter: React.FC = () => {
             left: `${hoverRect.left}px`,
             width: `${hoverRect.width}px`,
             height: `${hoverRect.height}px`,
-            border: '2px dashed #22c55e',
-            background: 'rgba(34, 197, 94, 0.04)',
+            border: '1.5px dashed rgba(236,72,153,0.85)',
+            background: 'rgba(236,72,153,0.04)',
             pointerEvents: 'none',
             zIndex: 2147483645,
             boxSizing: 'border-box',
           }}
-        />
+        >
+          {/* Hover label chip — bottom-left */}
+          <LabelChip
+            text={hoverInfo.tagClass}
+            dim={`${hoverInfo.width}×${hoverInfo.height}`}
+            color="#ec4899"
+            bg="linear-gradient(135deg,rgba(236,72,153,0.95),rgba(168,85,247,0.95))"
+            rectHeight={hoverRect.height}
+            rectBottom={hoverRect.top + hoverRect.height}
+          />
+        </div>
       )}
 
-      {/* Selected Highlight — solid green border */}
+      {/* Selected Highlight — blue solid border + label */}
       {selectRect && selectInfo && (
         <>
           <div
@@ -154,8 +144,8 @@ export const ElementHighlighter: React.FC = () => {
               left: `${selectRect.left}px`,
               width: `${selectRect.width}px`,
               height: `${selectRect.height}px`,
-              border: '2px solid #22c55e',
-              background: 'rgba(34, 197, 94, 0.06)',
+              border: '1.5px solid rgba(59,130,246,0.9)',
+              background: 'rgba(59,130,246,0.05)',
               pointerEvents: 'none',
               zIndex: 2147483645,
               boxSizing: 'border-box',
@@ -163,116 +153,106 @@ export const ElementHighlighter: React.FC = () => {
           >
             {/* Corner handles */}
             {[
-              { top: -4, left: -4 },
-              { top: -4, right: -4 },
-              { bottom: -4, left: -4 },
-              { bottom: -4, right: -4 },
+              { top: -3, left: -3 },
+              { top: -3, right: -3 },
+              { bottom: -3, left: -3 },
+              { bottom: -3, right: -3 },
             ].map((pos, i) => (
               <div key={i} style={{
                 position: 'absolute', ...pos,
-                width: 8, height: 8,
-                background: '#22c55e', borderRadius: 1, pointerEvents: 'none',
+                width: 6, height: 6,
+                background: '#3b82f6',
+                border: '1px solid rgba(255,255,255,0.6)',
+                borderRadius: 1.5,
+                pointerEvents: 'none',
               } as React.CSSProperties} />
             ))}
 
-            {/* Dimension badge */}
-            <div style={{
-              position: 'absolute', top: -4, left: '50%',
-              transform: 'translateX(-50%) translateY(-100%)',
-              background: '#f97316', color: '#fff', padding: '1px 6px',
-              fontSize: '10px', fontFamily: `-apple-system, BlinkMacSystemFont, system-ui, sans-serif`,
-              borderRadius: 3, whiteSpace: 'nowrap', pointerEvents: 'none',
-              fontWeight: 600, letterSpacing: '0.02em',
-            }}>
-              {selectInfo.width} × {selectInfo.height}
-            </div>
+            {/* Selected label chip — bottom-left */}
+            <LabelChip
+              text={selectInfo.tagClass}
+              dim={`${selectInfo.width}×${selectInfo.height}`}
+              color="#60a5fa"
+              bg="linear-gradient(135deg,rgba(37,99,235,0.97),rgba(59,130,246,0.97))"
+              rectHeight={selectRect.height}
+              rectBottom={selectRect.top + selectRect.height}
+            />
           </div>
 
-          {/* Distance Lines (Feature 4) */}
+          {/* Distance Lines */}
           {hoverRect && hoveredElement !== selectedElement && (
             <DistanceLines selectRect={selectRect} hoverRect={hoverRect} />
           )}
 
-          {/* Layout Debugger (Feature 11) */}
+          {/* Layout Debugger */}
           {selectedElement && <LayoutDebugger element={selectedElement} rect={selectRect} />}
-
-          {/* Floating info tooltip — hidden when editor panel is open */}
-          {!isEditing && <div
-            style={{
-              position: 'fixed',
-              ...getTooltipStyle(selectRect),
-              background: 'rgba(28, 28, 30, 0.94)',
-              backdropFilter: 'blur(40px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-              borderRadius: '13px',
-              padding: '11px 14px',
-              zIndex: 2147483646,
-              pointerEvents: 'auto',
-              boxShadow: '0 0 0 0.5px rgba(255,255,255,0.1), 0 12px 36px rgba(0,0,0,0.5)',
-              fontFamily: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif`,
-            }}
-          >
-            {/* Tag.class */}
-            <div style={{
-              fontSize: '12px', fontWeight: 600, color: '#34d399',
-              marginBottom: '9px', letterSpacing: '-0.01em',
-            }}>
-              {selectInfo.tagClass}
-            </div>
-
-            {/* Info rows */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <InfoRow icon="📐" label={`${selectInfo.width} × ${selectInfo.height}`} />
-              <InfoRow icon="🔤" label={`${selectInfo.fontSize} ${selectInfo.fontFamily}`} />
-              <InfoRow icon="color" color={selectInfo.color} label={rgbToHex(selectInfo.color)} />
-            </div>
-
-            {/* Click to edit — now functional */}
-            <div
-              onClick={handleEditClick}
-              style={{
-                marginTop: '8px', paddingTop: '8px',
-                borderTop: '0.5px solid rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', gap: '5px',
-                fontSize: '11px', color: '#34d399',
-                cursor: 'pointer',
-                fontWeight: 600,
-                transition: 'opacity 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-            >
-              <span style={{ fontSize: '12px' }}>✏️</span> Click to edit
-            </div>
-          </div>}
         </>
       )}
     </>
   );
 };
 
-const InfoRow: React.FC<{
-  icon: string;
-  label: string;
-  color?: string;
-}> = ({ icon, label, color }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: '8px',
-    fontSize: '11px', color: 'rgba(255,255,255,0.75)',
-  }}>
-    {icon === 'color' ? (
-      <div style={{
-        width: 12, height: 12, borderRadius: 2,
-        backgroundColor: color || '#000',
-        border: '1px solid rgba(255,255,255,0.2)',
+// ── Label chip — sits at bottom-left of selection/hover border ────────────────
+const LabelChip: React.FC<{
+  text: string;
+  dim: string;
+  color: string;
+  bg: string;
+  rectHeight: number;
+  rectBottom: number;
+}> = ({ text, dim, bg, rectBottom }) => {
+  // Flip above the border when too close to bottom of viewport
+  const CHIP_HEIGHT = 20;
+  const BOTTOM_MARGIN = 80; // toolbar height
+  const flipped = rectBottom + CHIP_HEIGHT + 4 > window.innerHeight - BOTTOM_MARGIN;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: -1,
+        ...(flipped
+          ? { bottom: '100%', marginBottom: '3px' }
+          : { top: '100%', marginTop: '3px' }),
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        background: bg,
+        borderRadius: '4px',
+        padding: '2px 7px 2px 6px',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+        maxWidth: '260px',
+        overflow: 'hidden',
+      }}
+    >
+      {/* tag.class */}
+      <span style={{
+        fontFamily: `'SF Mono','Cascadia Code','Fira Code',ui-monospace,monospace`,
+        fontSize: '11px',
+        fontWeight: 600,
+        color: '#fff',
+        letterSpacing: '-0.01em',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        minWidth: 0,
+      }}>
+        {text}
+      </span>
+      {/* dimension */}
+      <span style={{
+        fontFamily: `'SF Mono','Cascadia Code','Fira Code',ui-monospace,monospace`,
+        fontSize: '10px',
+        fontWeight: 500,
+        color: 'rgba(255,255,255,0.6)',
         flexShrink: 0,
-      }} />
-    ) : (
-      <span style={{ fontSize: '12px', width: 14, textAlign: 'center' }}>{icon}</span>
-    )}
-    <span>{label}</span>
-  </div>
-);
+      }}>
+        {dim}
+      </span>
+    </div>
+  );
+};
 
 const DistanceLines: React.FC<{ selectRect: BoxRect, hoverRect: BoxRect }> = ({ selectRect, hoverRect }) => {
   const getGaps = () => {

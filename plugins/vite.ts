@@ -60,6 +60,27 @@ export function optate(options: OptateOptions = {}): Plugin {
           return;
         }
 
+        // ── PWA manifest (makes DevTools installable as standalone app) ───
+        if (req.url === '/__optate/manifest.json') {
+          res.setHeader('Content-Type', 'application/manifest+json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            name: 'Optate DevTools',
+            short_name: 'Optate',
+            description: 'Real-time design inspection for your local dev server',
+            start_url: '/__optate/devtools',
+            scope: '/__optate/',
+            display: 'standalone',
+            background_color: '#0a0a0b',
+            theme_color: '#0a0a0b',
+            icons: [
+              { src: '/__optate/icon-192.png', sizes: '192x192', type: 'image/png' },
+              { src: '/__optate/icon-512.png', sizes: '512x512', type: 'image/png' },
+            ],
+          }, null, 2));
+          return;
+        }
+
         // ── Source file reader ────────────────────────────────────────────
         if (req.url?.startsWith('/__optate/source') && req.method === 'GET') {
           res.setHeader('Content-Type', 'application/json');

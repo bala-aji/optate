@@ -26,7 +26,7 @@ export const PanelShell: React.FC<PanelShellProps> = ({
     selectedElement, setSelectedElement,
     hoveredElement, setHoveredElement,
     viewportMode, setViewportMode,
-    isLeftPanelOpen,
+    isLeftPanelOpen, setIsLeftPanelOpen,
     isEditing, setIsEditing,
   } = useSelection();
 
@@ -82,6 +82,7 @@ export const PanelShell: React.FC<PanelShellProps> = ({
     if (viewportMode === 'desktop') return;
     document.body.style.maxWidth = `${canvasWidth}px`;
   }, [viewportMode, canvasWidth]);
+
 
    // Keyboard Shortcuts
   useEffect(() => {

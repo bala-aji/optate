@@ -8,6 +8,8 @@ export function buildDevtoolsHtml(): string {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#0a0a0b"/>
+<link rel="manifest" href="/__optate/manifest.json"/>
 <title>Optate DevTools</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -84,6 +86,26 @@ body{display:flex;flex-direction:column}
   background:rgba(168,85,247,.2)!important;
   color:rgba(168,85,247,1)!important;
 }
+
+/* Install App button */
+#installBtn{
+  display:none;
+  background:rgba(34,197,94,.1)!important;
+  border-color:rgba(34,197,94,.3)!important;
+  color:rgba(34,197,94,.9)!important;
+}
+#installBtn:hover{
+  background:rgba(34,197,94,.2)!important;
+  color:rgba(34,197,94,1)!important;
+}
+/* Install tip banner */
+#install-tip{
+  display:none;align-items:center;justify-content:center;gap:10px;
+  padding:7px 16px;
+  background:rgba(34,197,94,.06);border-bottom:1px solid rgba(34,197,94,.15);
+  font-size:11.5px;color:rgba(34,197,94,.75);flex-shrink:0;
+}
+#install-tip strong{color:rgba(34,197,94,.95)}
 
 /* Redirect screen — shown in the original tab after popup opens */
 #redirect-screen{
@@ -177,6 +199,20 @@ body{display:flex;flex-direction:column}
     </svg>
     Pop out
   </button>
+  <button class="tb-btn" id="installBtn" title="Install as app — removes the address bar permanently">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 2v8M5 7l3 3 3-3"/>
+      <path d="M2 12h12v2H2z"/>
+    </svg>
+    Install App
+  </button>
+</div>
+
+<!-- Install tip — shown once PWA is already installed -->
+<div id="install-tip">
+  ✓ <strong>Optate DevTools is installed.</strong> Open from your Applications / dock for a chrome-free experience.
+  <button onclick="document.getElementById('install-tip').style.display='none'"
+    style="background:none;border:none;color:rgba(34,197,94,.5);cursor:pointer;font-size:13px;padding:0 4px">✕</button>
 </div>
 
 <!-- Redirect screen (shown in original tab after popup auto-opens) -->
@@ -268,6 +304,34 @@ function reopenStandalone() { const w = _doOpen(); if (w) w.focus(); }
     if (blocked) blocked.style.display = 'flex';
   }
 })();
+
+// ── PWA Install ───────────────────────────────────────────────────────────────
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _installPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('installBtn');
+  const tip = document.getElementById('install-tip');
+  if (btn) btn.style.display = 'none';
+  if (tip) tip.style.display = 'flex';
+  _installPrompt = null;
+});
+
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (!_installPrompt) return;
+  _installPrompt.prompt();
+  const { outcome } = await _installPrompt.userChoice;
+  if (outcome === 'accepted') {
+    document.getElementById('installBtn').style.display = 'none';
+  }
+  _installPrompt = null;
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let inspectMode = false;
