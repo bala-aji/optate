@@ -54,8 +54,6 @@ function isTailwind(cls: string) {
 export const LayersPanel: React.FC = () => {
   const { isLeftPanelOpen, setIsLeftPanelOpen, searchQuery, setSearchQuery } = useSelection();
 
-  // Never show inside the DevTools preview iframe
-  if (typeof window !== 'undefined' && window.name === '__optate_devtools') return null;
   if (!isLeftPanelOpen) return null;
 
   return (

@@ -18,19 +18,23 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
 
 /* ── Toolbar ── */
 #toolbar{
-  display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;gap:8px;
   height:42px;padding:0 14px;
   background:#111113;border-bottom:1px solid rgba(255,255,255,0.07);
   flex-shrink:0;
 }
-.toolbar-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#e5e5ea}
+.toolbar-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#e5e5ea;flex-shrink:0}
 .toolbar-badge{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   color:rgba(168,85,247,.9);background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.2);
   padding:2px 7px;border-radius:20px}
+/* URL bar row — grows to fill available space and centers the input */
+#url-row{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:4px;
+}
 #urlBar{
-  flex:1;height:26px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  width:100%;max-width:480px;height:26px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
   border-radius:6px;padding:0 10px;color:#e5e5ea;font-size:12px;font-family:inherit;outline:none;
-  max-width:500px;
 }
 #urlBar:focus{border-color:rgba(168,85,247,.5)}
 .tb-btn{
@@ -38,12 +42,11 @@ html,body{height:100%;overflow:hidden;background:#0a0a0b;color:#e5e5ea;
   height:26px;padding:0 10px;background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.08);border-radius:6px;
   color:rgba(235,235,245,.6);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;
-  transition:all .15s;white-space:nowrap;
+  transition:all .15s;white-space:nowrap;flex-shrink:0;
 }
 .tb-btn:hover{background:rgba(255,255,255,.09);color:rgba(235,235,245,.9)}
 .tb-btn.active{background:rgba(168,85,247,.15);border-color:rgba(168,85,247,.3);color:rgba(168,85,247,.9)}
 .tb-sep{width:1px;height:20px;background:rgba(255,255,255,.07);flex-shrink:0}
-.viewport-btns{display:flex;gap:4px}
 
 /* ── Layout ── */
 #layout{display:flex;flex:1;overflow:hidden;min-height:0}
@@ -167,30 +170,16 @@ body{display:flex;flex-direction:column}
     <span class="toolbar-badge">DevTools</span>
   </div>
   <div class="tb-sep"></div>
-  <input id="urlBar" type="text" value="/" placeholder="/" spellcheck="false"/>
-  <button class="tb-btn" id="goBtn" title="Navigate">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3l5 5-5 5M3 8h10"/></svg>
-  </button>
-  <button class="tb-btn" id="reloadBtn" title="Reload">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/><path d="M13.5 2v3.5H10"/></svg>
-  </button>
-  <div class="tb-sep"></div>
-  <div class="viewport-btns">
-    <button class="tb-btn active" id="vp-desktop" title="Desktop" data-vp="desktop">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="2" width="14" height="10" rx="1.5"/><path d="M5 14h6M8 12v2"/></svg>
+  <!-- Centered URL row -->
+  <div id="url-row">
+    <button class="tb-btn" id="reloadBtn" title="Reload" style="padding:0 8px">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/><path d="M13.5 2v3.5H10"/></svg>
     </button>
-    <button class="tb-btn" id="vp-tablet" title="Tablet" data-vp="tablet">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="1" width="12" height="14" rx="1.5"/><circle cx="8" cy="12.5" r=".8" fill="currentColor"/></svg>
-    </button>
-    <button class="tb-btn" id="vp-mobile" title="Mobile" data-vp="mobile">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="1" width="8" height="14" rx="1.5"/><circle cx="8" cy="12.5" r=".7" fill="currentColor"/></svg>
+    <input id="urlBar" type="text" value="/" placeholder="/" spellcheck="false"/>
+    <button class="tb-btn" id="goBtn" title="Navigate" style="padding:0 8px">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3l5 5-5 5M3 8h10"/></svg>
     </button>
   </div>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" id="inspectToggle" title="Toggle inspect mode">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M10 10l4 4"/></svg>
-    Inspect
-  </button>
   <div class="tb-sep" id="popout-sep"></div>
   <button class="tb-btn tb-btn-popout" id="popOutBtn" title="Open as standalone window (no browser UI)">
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -373,22 +362,6 @@ frame.addEventListener('load', () => {
   } catch {}
 });
 
-// ── Viewport ──────────────────────────────────────────────────────────────────
-document.querySelectorAll('[data-vp]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('[data-vp]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    frame.className = btn.dataset.vp;
-  });
-});
-
-// ── Inspect toggle ─────────────────────────────────────────────────────────────
-const inspectBtn = document.getElementById('inspectToggle');
-inspectBtn.addEventListener('click', () => {
-  inspectMode = !inspectMode;
-  inspectBtn.classList.toggle('active', inspectMode);
-  frame.contentWindow?.postMessage({ type: 'optate:inspect-mode', enabled: inspectMode }, '*');
-});
 
 // ── postMessage receiver (hover only) ────────────────────────────────────────
 window.addEventListener('message', (e) => {
