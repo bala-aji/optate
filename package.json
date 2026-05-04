@@ -54,6 +54,9 @@
       "optional": false
     }
   },
+  "overrides": {
+    "uuid": ">=9.0.1"
+  },
   "dependencies": {},
   "devDependencies": {
     "animejs": "^4.3.6",
