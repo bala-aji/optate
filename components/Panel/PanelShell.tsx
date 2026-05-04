@@ -37,11 +37,10 @@ export const PanelShell: React.FC<PanelShellProps> = ({
   const [canvasWidth, setCanvasWidth] = useState(375);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [triggerPos, setTriggerPos] = useState({ x: window.innerWidth - 72, y: window.innerHeight / 2 - 22 });
-  const [autoApply, setAutoApply] = useState(false);
-  const [autoApplyState, setAutoApplyState] = useState<'idle' | 'applying' | 'done' | 'error'>('idle');
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
   const dragRef = useRef({ isDragging: false, offsetX: 0, offsetY: 0, startX: 0, startY: 0, hasDragged: false });
   const changesRef = useRef<HTMLDivElement>(null);
-  const autoApplyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Viewport simulation — constrain body width directly (no iframe)
   useEffect(() => {
@@ -180,43 +179,46 @@ export const PanelShell: React.FC<PanelShellProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-apply: debounce-flush every change straight to source files via /__optate/apply
+  // Always-on auto-sync: every edit is debounced 600ms then patched into source
+  // files via /__optate/sync. Mirrors the watcher architecture:
+  //   edit → change-list.json → file watcher → source patcher → HMR → browser
   useEffect(() => {
-    if (!autoApply) return;
-
     const unsub = changeTracker.subscribe(() => {
       const changes = changeTracker.getChanges();
       if (changes.length === 0) return;
 
-      if (autoApplyTimer.current) clearTimeout(autoApplyTimer.current);
-      autoApplyTimer.current = setTimeout(async () => {
-        setAutoApplyState('applying');
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+      setSyncState('syncing');
+
+      syncTimer.current = setTimeout(async () => {
         try {
-          const res = await fetch('/__optate/apply', {
+          const res = await fetch('/__optate/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ changes }),
           });
           if (res.ok) {
+            // Keep overrideSheet alive — HMR will reload with source changes
             changeTracker.clearAfterApply();
-            setAutoApplyState('done');
-            setTimeout(() => setAutoApplyState('idle'), 1500);
+            setSyncState('done');
+            setTimeout(() => setSyncState('idle'), 1500);
           } else {
-            setAutoApplyState('error');
-            setTimeout(() => setAutoApplyState('idle'), 2000);
+            setSyncState('error');
+            setTimeout(() => setSyncState('idle'), 2500);
           }
         } catch {
-          setAutoApplyState('error');
-          setTimeout(() => setAutoApplyState('idle'), 2000);
+          // Dev server might not be running — silently stay in error state
+          setSyncState('error');
+          setTimeout(() => setSyncState('idle'), 2500);
         }
-      }, 800);
+      }, 600);
     });
 
     return () => {
       unsub();
-      if (autoApplyTimer.current) clearTimeout(autoApplyTimer.current);
+      if (syncTimer.current) clearTimeout(syncTimer.current);
     };
-  }, [autoApply]);
+  }, []);
 
   // Draggable trigger bubble
   useEffect(() => {
@@ -442,34 +444,43 @@ export const PanelShell: React.FC<PanelShellProps> = ({
 
           <ToolbarDivider />
 
-          {/* Auto-apply toggle */}
-          <ToolbarButton
-            onClick={() => {
-              setAutoApply(a => !a);
-              setAutoApplyState('idle');
+          {/* Live sync status indicator — always on, no toggle */}
+          <div
+            title={
+              syncState === 'syncing' ? 'Syncing changes to source files…'
+            : syncState === 'done'    ? 'Changes applied to source files ✓'
+            : syncState === 'error'   ? 'Sync failed — is the dev server running?'
+            : 'Auto-sync active — edits apply to source files automatically'
+            }
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '7px 10px', borderRadius: '11px',
+              color: syncState === 'error'   ? '#f87171'
+                   : syncState === 'done'    ? '#34d399'
+                   : syncState === 'syncing' ? '#a78bfa'
+                   : 'rgba(235,235,245,0.48)',
+              fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em',
+              userSelect: 'none',
             }}
-            active={autoApply}
-            tooltip={autoApply ? 'Live sync ON — changes auto-apply to source files' : 'Live sync OFF — enable to auto-apply changes'}
-            style={autoApply ? {
-              color: autoApplyState === 'error' ? '#f87171'
-                   : autoApplyState === 'done'  ? '#34d399'
-                   : '#a78bfa',
-            } : {}}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {/* Lightning bolt */}
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M9.5 1L3 9.5h5.5L6 15l8-9h-5.5L9.5 1z"/>
-              </svg>
-              <span style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em' }}>
-                {autoApplyState === 'applying' ? 'Syncing…'
-               : autoApplyState === 'done'     ? 'Synced ✓'
-               : autoApplyState === 'error'    ? 'Error ✗'
-               : autoApply                     ? 'Live'
-               : 'Sync'}
-              </span>
+            {/* Animated dot */}
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+              background: syncState === 'error'   ? '#f87171'
+                        : syncState === 'done'    ? '#34d399'
+                        : syncState === 'syncing' ? '#a78bfa'
+                        : 'rgba(52,211,153,0.7)',
+              boxShadow: syncState === 'syncing' ? '0 0 6px #a78bfa' : 'none',
+              animation: syncState === 'syncing' ? 'optate-pulse 1s ease-in-out infinite' : 'none',
+            }} />
+            <span>
+              {syncState === 'syncing' ? 'Syncing…'
+             : syncState === 'done'    ? 'Synced'
+             : syncState === 'error'   ? 'Sync error'
+             : 'Live'}
             </span>
-          </ToolbarButton>
+            <style>{`@keyframes optate-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+          </div>
 
           {/* Changes button */}
           <ToolbarButton

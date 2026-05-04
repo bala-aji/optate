@@ -23,8 +23,47 @@ export interface OptateOptions {
   editor?: EditorName;
 }
 
+// ── Persisted override state ─────────────────────────────────────────────────
+// Key: `selector|||property`, Value: newValue
+// Stored in .optate-state.json at project root so refreshes survive.
+
+interface OverrideStore {
+  [key: string]: { selector: string; property: string; value: string };
+}
+
+function loadOverrideStore(projectRoot: string): OverrideStore {
+  try {
+    const p = resolve(projectRoot, '.optate-state.json');
+    if (existsSync(p)) return JSON.parse(readFileSync(p, 'utf-8'));
+  } catch {}
+  return {};
+}
+
+function saveOverrideStore(projectRoot: string, store: OverrideStore) {
+  try {
+    writeFileSync(resolve(projectRoot, '.optate-state.json'), JSON.stringify(store, null, 2), 'utf-8');
+  } catch {}
+}
+
+function buildOverrideCss(store: OverrideStore): string {
+  if (Object.keys(store).length === 0) return '/* no optate overrides */';
+  // Group by selector
+  const bySelector = new Map<string, Array<{ property: string; value: string }>>();
+  for (const entry of Object.values(store)) {
+    if (!bySelector.has(entry.selector)) bySelector.set(entry.selector, []);
+    bySelector.get(entry.selector)!.push({ property: entry.property, value: entry.value });
+  }
+  const blocks: string[] = ['/* Optate applied overrides — auto-generated */'];
+  for (const [selector, rules] of bySelector) {
+    const props = rules.map(r => `  ${r.property}: ${r.value} !important;`).join('\n');
+    blocks.push(`${selector} {\n${props}\n}`);
+  }
+  return blocks.join('\n\n');
+}
+
 export function optate(options: OptateOptions = {}): Plugin {
   let projectRoot = process.cwd();
+  let overrideStore: OverrideStore = {};
 
   return {
     name: 'optate',
@@ -32,6 +71,7 @@ export function optate(options: OptateOptions = {}): Plugin {
 
     configResolved(config) {
       projectRoot = config.root;
+      overrideStore = loadOverrideStore(projectRoot);
     },
 
     configureServer(server: ViteDevServer) {
@@ -239,6 +279,74 @@ self.addEventListener('fetch',    (e) => e.respondWith(fetch(e.request)));
           return;
         }
 
+        // ── Real-time sync: write change-list.json + patch source files ──
+        // This is the primary auto-apply path (called on every edit, debounced
+        // client-side). Returns quickly so HMR can fire.
+        if (req.url === '/__optate/sync' && req.method === 'POST') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          let payload: { changes: any[] };
+          try {
+            const body = await readBody(req);
+            payload = JSON.parse(body);
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+            return;
+          }
+
+          if (!Array.isArray(payload?.changes) || payload.changes.length === 0) {
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ok: true, skipped: true }));
+            return;
+          }
+
+          try {
+            const { results, editorScheme } = applyChanges(payload.changes, projectRoot, options.editor);
+
+            // Persist fallback overrides so refreshes keep the changes
+            for (let i = 0; i < payload.changes.length; i++) {
+              const change = payload.changes[i];
+              const result = results[i];
+              if (!result || change.type !== 'style') continue;
+              const key = `${change.selector}|||${change.property}`;
+              if (result.status === 'patched' && result.method !== 'css-override') {
+                delete overrideStore[key];
+              } else {
+                overrideStore[key] = { selector: change.selector, property: change.property, value: change.newValue };
+              }
+            }
+            saveOverrideStore(projectRoot, overrideStore);
+
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ok: true, results }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+          }
+          return;
+        }
+
+        // ── CORS preflight for sync ───────────────────────────────────────
+        if (req.url === '/__optate/sync' && req.method === 'OPTIONS') {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        // ── Serve persisted override CSS (survives page refreshes) ───────
+        if (req.url === '/__optate/overrides.css') {
+          res.setHeader('Content-Type', 'text/css');
+          res.setHeader('Cache-Control', 'no-store');
+          res.statusCode = 200;
+          res.end(buildOverrideCss(overrideStore));
+          return;
+        }
+
         // ── Apply changes to source files ─────────────────────────────────
         if (req.url === '/__optate/apply' && req.method === 'POST') {
           res.setHeader('Content-Type', 'application/json');
@@ -263,6 +371,31 @@ self.addEventListener('fetch',    (e) => e.respondWith(fetch(e.request)));
           try {
             const { results, jsonPath, editorScheme } = applyChanges(payload.changes, projectRoot, options.editor);
             const cursorPrompt = generateCursorPrompt(payload.changes, results);
+
+            // For every change that couldn't be patched into source (json-only
+            // or css-override fallback), persist it in the override store so it
+            // survives page refreshes via /__optate/overrides.css.
+            for (let i = 0; i < payload.changes.length; i++) {
+              const change = payload.changes[i];
+              const result = results[i];
+              if (!result || change.type !== 'style') continue;
+
+              const key = `${change.selector}|||${change.property}`;
+              if (result.status === 'patched' && result.method !== 'css-override') {
+                // Patched directly into source — remove from override store
+                // so the source value takes precedence after HMR reloads.
+                delete overrideStore[key];
+              } else {
+                // Could not patch source — keep in override store
+                overrideStore[key] = {
+                  selector: change.selector,
+                  property: change.property,
+                  value: change.newValue,
+                };
+              }
+            }
+            saveOverrideStore(projectRoot, overrideStore);
+
             res.statusCode = 200;
             res.end(JSON.stringify({ results, jsonPath, cursorPrompt, editorScheme }));
           } catch (err: any) {
@@ -319,6 +452,12 @@ self.addEventListener('fetch',    (e) => e.respondWith(fetch(e.request)));
 
     transformIndexHtml() {
       return [
+        // Override CSS always loaded first — persists applied changes across refreshes
+        {
+          tag: 'link',
+          attrs: { rel: 'stylesheet', href: '/__optate/overrides.css' },
+          injectTo: 'head' as const,
+        },
         {
           tag: 'script',
           attrs: { src: '/__optate/client.js', defer: true },
