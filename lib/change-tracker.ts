@@ -194,11 +194,29 @@ class ChangeTracker {
   canUndo() { return this.undoStack.length > 0; }
   canRedo() { return this.redoStack.length > 0; }
 
+  /**
+   * Full clear — wipes both the change list AND the in-browser override sheet.
+   * Use when the panel is closed or the user explicitly discards all changes.
+   */
   clear() {
     this.changes = [];
     this.undoStack = [];
     this.redoStack = [];
     overrideSheet.clear();
+    this.notify();
+  }
+
+  /**
+   * Soft clear — wipes the change list (and persisted storage) but keeps the
+   * overrideSheet styles alive so the page doesn't visually snap back.
+   * Use after Apply: source files have been patched, HMR will reload the page
+   * shortly and the styles will be backed by real source changes.
+   */
+  clearAfterApply() {
+    this.changes = [];
+    this.undoStack = [];
+    this.redoStack = [];
+    // intentionally do NOT call overrideSheet.clear()
     this.notify();
   }
 

@@ -198,7 +198,7 @@ export const PanelShell: React.FC<PanelShellProps> = ({
             body: JSON.stringify({ changes }),
           });
           if (res.ok) {
-            changeTracker.clear();
+            changeTracker.clearAfterApply();
             setAutoApplyState('done');
             setTimeout(() => setAutoApplyState('idle'), 1500);
           } else {
@@ -665,8 +665,9 @@ const ChangesContent: React.FC = () => {
       if (data.cursorPrompt) {
         try { await navigator.clipboard.writeText(data.cursorPrompt); } catch {}
       }
-      // Clear the change tracker — applied changes are now in source files
-      changeTracker.clear();
+      // Clear the change list but keep overrideSheet alive so the page
+      // doesn't snap back visually — HMR will reload with the patched source.
+      changeTracker.clearAfterApply();
       setApplyResults(resultMap);
     } catch (err) {
       console.error('[Optate] Apply failed:', err);
