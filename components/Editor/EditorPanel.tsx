@@ -611,9 +611,6 @@ function hexToRgb(hex: string) {
   const clean = hex.replace('#', '');
   return { r: parseInt(clean.slice(0,2),16), g: parseInt(clean.slice(2,4),16), b: parseInt(clean.slice(4,6),16) };
 }
-function rgbToHex(r: number, g: number, b: number) {
-  return '#' + [r,g,b].map(x => Math.max(0,Math.min(255,x)).toString(16).padStart(2,'0')).join('');
-}
 function buildGradientCss(type: string, angle: number, stops: GradientStop[]) {
   const sorted = [...stops].sort((a,b) => a.position - b.position);
   const cs = sorted.map(s => {

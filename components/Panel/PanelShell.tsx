@@ -37,8 +37,11 @@ export const PanelShell: React.FC<PanelShellProps> = ({
   const [canvasWidth, setCanvasWidth] = useState(375);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [triggerPos, setTriggerPos] = useState({ x: window.innerWidth - 72, y: window.innerHeight / 2 - 22 });
+  const [autoApply, setAutoApply] = useState(false);
+  const [autoApplyState, setAutoApplyState] = useState<'idle' | 'applying' | 'done' | 'error'>('idle');
   const dragRef = useRef({ isDragging: false, offsetX: 0, offsetY: 0, startX: 0, startY: 0, hasDragged: false });
   const changesRef = useRef<HTMLDivElement>(null);
+  const autoApplyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Viewport simulation — constrain body width directly (no iframe)
   useEffect(() => {
@@ -176,6 +179,44 @@ export const PanelShell: React.FC<PanelShellProps> = ({
     const timer = setTimeout(() => setIsVisible(true), 50);
     return () => clearTimeout(timer);
   }, []);
+
+  // Auto-apply: debounce-flush every change straight to source files via /__optate/apply
+  useEffect(() => {
+    if (!autoApply) return;
+
+    const unsub = changeTracker.subscribe(() => {
+      const changes = changeTracker.getChanges();
+      if (changes.length === 0) return;
+
+      if (autoApplyTimer.current) clearTimeout(autoApplyTimer.current);
+      autoApplyTimer.current = setTimeout(async () => {
+        setAutoApplyState('applying');
+        try {
+          const res = await fetch('/__optate/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes }),
+          });
+          if (res.ok) {
+            changeTracker.clear();
+            setAutoApplyState('done');
+            setTimeout(() => setAutoApplyState('idle'), 1500);
+          } else {
+            setAutoApplyState('error');
+            setTimeout(() => setAutoApplyState('idle'), 2000);
+          }
+        } catch {
+          setAutoApplyState('error');
+          setTimeout(() => setAutoApplyState('idle'), 2000);
+        }
+      }, 800);
+    });
+
+    return () => {
+      unsub();
+      if (autoApplyTimer.current) clearTimeout(autoApplyTimer.current);
+    };
+  }, [autoApply]);
 
   // Draggable trigger bubble
   useEffect(() => {
@@ -400,6 +441,35 @@ export const PanelShell: React.FC<PanelShellProps> = ({
           </div>
 
           <ToolbarDivider />
+
+          {/* Auto-apply toggle */}
+          <ToolbarButton
+            onClick={() => {
+              setAutoApply(a => !a);
+              setAutoApplyState('idle');
+            }}
+            active={autoApply}
+            tooltip={autoApply ? 'Live sync ON — changes auto-apply to source files' : 'Live sync OFF — enable to auto-apply changes'}
+            style={autoApply ? {
+              color: autoApplyState === 'error' ? '#f87171'
+                   : autoApplyState === 'done'  ? '#34d399'
+                   : '#a78bfa',
+            } : {}}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {/* Lightning bolt */}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M9.5 1L3 9.5h5.5L6 15l8-9h-5.5L9.5 1z"/>
+              </svg>
+              <span style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em' }}>
+                {autoApplyState === 'applying' ? 'Syncing…'
+               : autoApplyState === 'done'     ? 'Synced ✓'
+               : autoApplyState === 'error'    ? 'Error ✗'
+               : autoApply                     ? 'Live'
+               : 'Sync'}
+              </span>
+            </span>
+          </ToolbarButton>
 
           {/* Changes button */}
           <ToolbarButton
