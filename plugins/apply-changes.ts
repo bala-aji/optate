@@ -109,12 +109,15 @@ function scanFiles(dir: string, exts: string[]): string[] {
 }
 
 // ── TSX inline style patcher ─────────────────────────────────────────────────
+// NOTE: oldValue is a computed browser value (e.g. "rgb(59,130,246)") and will
+// NOT match the authored source value (e.g. "#3b82f6"). We therefore match on
+// the property name only and replace whatever value is currently there.
 
 function patchTsx(
   projectRoot: string,
   componentChain: string[],
   property: string,
-  oldValue: string,
+  _oldValue: string,
   newValue: string
 ): { patched: boolean; file?: string } {
   const camel = toCamelCase(property);
@@ -135,22 +138,24 @@ function patchTsx(
     );
     if (!mentionsComponent) continue;
 
-    // Match: camelProp: 'oldValue' or camelProp: "oldValue"
-    const quoted = new RegExp(
-      `(${escapeRegex(camel)}\\s*:\\s*)(['"])${escapeRegex(oldValue)}\\2`,
+    // Replace camelProp: 'anyValue' → camelProp: 'newValue'
+    // Also handles: camelProp: "anyValue" and camelProp: bareValue
+    const quotedRe = new RegExp(
+      `(${escapeRegex(camel)}\\s*:\\s*)(['"])[^'"]*\\2`,
       'g'
     );
-    // Match: camelProp: 123 (bare number/keyword)
-    const bare = new RegExp(
-      `(${escapeRegex(camel)}\\s*:\\s*)${escapeRegex(oldValue)}(?=[,\\s}\\n])`,
+    // Bare values: number, keyword, CSS unit (no quotes)
+    const bareRe = new RegExp(
+      `(${escapeRegex(camel)}\\s*:\\s*)(?!['"])[^,}\\n\\r]+`,
       'g'
     );
 
     let newContent = content;
-    if (quoted.test(content)) {
-      newContent = content.replace(quoted, (_m, pre, q) => `${pre}${q}${newValue}${q}`);
-    } else if (bare.test(content)) {
-      newContent = content.replace(bare, `$1${newValue}`);
+    if (quotedRe.test(content)) {
+      // Preserve original quote character
+      newContent = content.replace(quotedRe, (_m, pre, q) => `${pre}${q}${newValue}${q}`);
+    } else if (bareRe.test(content)) {
+      newContent = content.replace(bareRe, `$1${newValue}`);
     }
 
     if (newContent !== content) {
@@ -163,11 +168,13 @@ function patchTsx(
 }
 
 // ── CSS / SCSS patcher ───────────────────────────────────────────────────────
+// Same rationale: match on property name only, replace whatever value follows.
 
 function patchCss(
   projectRoot: string,
+  selector: string,
   property: string,
-  oldValue: string,
+  _oldValue: string,
   newValue: string
 ): { patched: boolean; file?: string } {
   const files = scanFiles(projectRoot, ['.css', '.scss', '.sass', '.less']);
@@ -176,11 +183,19 @@ function patchCss(
     let content: string;
     try { content = readFileSync(filePath, 'utf-8'); } catch { continue; }
 
+    // Only patch if this file mentions the selector (or part of it)
+    // Use the last simple segment of the selector for a quick sanity check
+    const selectorHint = selector.split(/[\s>+~]/).pop() ?? selector;
+    const hasSelectorHint = content.includes(selectorHint);
+
+    // Replace: property: <anything>; (respects semicolon or end-of-block)
     const pattern = new RegExp(
-      `(${escapeRegex(property)}\\s*:\\s*)${escapeRegex(oldValue)}(\\s*(?:;|$))`,
+      `(${escapeRegex(property)}\\s*:\\s*)[^;{}\\n]+?(\\s*(?:!important)?\\s*(?:;|(?=[}\\n])))`,
       'gm'
     );
+
     if (!pattern.test(content)) continue;
+    if (!hasSelectorHint) continue;
 
     const newContent = content.replace(pattern, `$1${newValue}$2`);
     if (newContent === content) continue;
@@ -194,6 +209,35 @@ function patchCss(
 
 // ── CSS override fallback (Tailwind / undetected sources) ────────────────────
 
+/** Known CSS entry-point filenames searched in order */
+const CSS_ENTRY_CANDIDATES = [
+  'src/index.css', 'src/global.css', 'src/globals.css', 'src/app.css',
+  'src/main.css', 'src/styles.css', 'src/style.css',
+  'styles/globals.css', 'styles/global.css', 'styles/index.css',
+  'app/globals.css', 'app/global.css',
+  'index.css', 'global.css', 'globals.css',
+];
+
+function ensureOverrideImport(projectRoot: string): void {
+  const importLine = "@import './optate-overrides.css';";
+  const importLineAlt = '@import "./optate-overrides.css";';
+
+  for (const candidate of CSS_ENTRY_CANDIDATES) {
+    const candidatePath = resolve(projectRoot, candidate);
+    if (!existsSync(candidatePath)) continue;
+
+    let content: string;
+    try { content = readFileSync(candidatePath, 'utf-8'); } catch { continue; }
+
+    if (content.includes('optate-overrides.css')) return; // already imported
+
+    // Prepend the import so it can be overridden by later rules
+    writeFileSync(candidatePath, importLine + '\n' + content, 'utf-8');
+    return;
+  }
+  // No entry file found — silently skip; user must import manually
+}
+
 function writeOverrideCss(
   projectRoot: string,
   selector: string,
@@ -201,22 +245,31 @@ function writeOverrideCss(
   newValue: string
 ): string {
   const overridePath = resolve(projectRoot, 'optate-overrides.css');
-  const rule = `/* Optate */\n${selector} {\n  ${property}: ${newValue};\n}\n`;
+
+  // Group selector+property in a comment-tagged block so we can find + update it
+  const blockTag = `/* optate:${selector}|${property} */`;
+  const rule = `${blockTag}\n${selector} {\n  ${property}: ${newValue} !important;\n}\n`;
 
   let existing = '';
   try { existing = readFileSync(overridePath, 'utf-8'); } catch {}
 
-  // Replace existing block for same selector+property if present
-  const blockRe = new RegExp(
-    `\\/\\* Optate \\*\\/\\n${escapeRegex(selector)} \\{[^}]*${escapeRegex(property)}:[^}]*\\}\\n`,
-    'g'
-  );
-
-  const newContent = blockRe.test(existing)
-    ? existing.replace(blockRe, rule)
-    : (existing ? existing + '\n' + rule : rule);
+  let newContent: string;
+  if (existing.includes(blockTag)) {
+    // Replace existing block for same selector+property
+    const blockRe = new RegExp(
+      `\\/\\* optate:${escapeRegex(selector)}\\|${escapeRegex(property)} \\*\\/\\n${escapeRegex(selector)} \\{[^}]*\\}\\n`,
+      'g'
+    );
+    newContent = existing.replace(blockRe, rule);
+  } else {
+    newContent = existing ? existing + '\n' + rule : rule;
+  }
 
   writeFileSync(overridePath, newContent.trim() + '\n', 'utf-8');
+
+  // Auto-import the override file into the project's main CSS entry
+  ensureOverrideImport(projectRoot);
+
   return relative(projectRoot, overridePath);
 }
 
@@ -264,7 +317,7 @@ export function applyChanges(
     }
 
     // 2. Try CSS / SCSS
-    const css = patchCss(projectRoot, change.property, change.oldValue, change.newValue);
+    const css = patchCss(projectRoot, change.selector, change.property, change.oldValue, change.newValue);
     if (css.patched && css.file) {
       results.push(makeResult(css.file, 'css'));
       continue;
