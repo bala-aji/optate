@@ -2,9 +2,9 @@
 // Node.js only — runs in the Vite server process
 
 import {
-  readFileSync, writeFileSync, existsSync, readdirSync,
+  readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync,
 } from 'node:fs';
-import { resolve, join, extname, relative } from 'node:path';
+import { resolve, join, extname, relative, dirname } from 'node:path';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,8 +110,35 @@ function scanFiles(dir: string, exts: string[]): string[] {
 
 // ── TSX inline style patcher ─────────────────────────────────────────────────
 // NOTE: oldValue is a computed browser value (e.g. "rgb(59,130,246)") and will
-// NOT match the authored source value (e.g. "#3b82f6"). We therefore match on
-// the property name only and replace whatever value is currently there.
+// NOT match the authored source value (e.g. "#3b82f6"). We match on the
+// property name only and replace the value in the component's body.
+
+/** Extract the source text of the first component body that declares one of the names */
+function extractComponentBody(content: string, names: string[]): { body: string; start: number; end: number } | null {
+  for (const name of names) {
+    // Find `function Name` or `const Name` or `class Name`
+    const declRe = new RegExp(`(?:function\\s+${escapeRegex(name)}|const\\s+${escapeRegex(name)}\\s*=|class\\s+${escapeRegex(name)})`, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = declRe.exec(content)) !== null) {
+      // Walk forward to find the opening brace
+      let i = m.index + m[0].length;
+      while (i < content.length && content[i] !== '{') i++;
+      if (i >= content.length) continue;
+
+      // Balance braces to find the component body end
+      let depth = 0;
+      const start = i;
+      while (i < content.length) {
+        if (content[i] === '{') depth++;
+        else if (content[i] === '}') { depth--; if (depth === 0) break; }
+        i++;
+      }
+      if (depth !== 0) continue;
+      return { body: content.slice(start, i + 1), start, end: i + 1 };
+    }
+  }
+  return null;
+}
 
 function patchTsx(
   projectRoot: string,
@@ -138,27 +165,31 @@ function patchTsx(
     );
     if (!mentionsComponent) continue;
 
-    // Replace camelProp: 'anyValue' → camelProp: 'newValue'
-    // Also handles: camelProp: "anyValue" and camelProp: bareValue
+    // Scope the replacement to just the component body to avoid corrupting
+    // other components in the same file.
+    const bodyInfo = extractComponentBody(content, names);
+    if (!bodyInfo) continue;
+
+    const { body, start, end } = bodyInfo;
+
+    // Replace camelProp: 'anyValue' → camelProp: 'newValue' (first match only)
     const quotedRe = new RegExp(
-      `(${escapeRegex(camel)}\\s*:\\s*)(['"])[^'"]*\\2`,
-      'g'
+      `(${escapeRegex(camel)}\\s*:\\s*)(['"])[^'"]*\\2`
     );
     // Bare values: number, keyword, CSS unit (no quotes)
     const bareRe = new RegExp(
-      `(${escapeRegex(camel)}\\s*:\\s*)(?!['"])[^,}\\n\\r]+`,
-      'g'
+      `(${escapeRegex(camel)}\\s*:\\s*)(?!['"])[^,}\\n\\r]+`
     );
 
-    let newContent = content;
-    if (quotedRe.test(content)) {
-      // Preserve original quote character
-      newContent = content.replace(quotedRe, (_m, pre, q) => `${pre}${q}${newValue}${q}`);
-    } else if (bareRe.test(content)) {
-      newContent = content.replace(bareRe, `$1${newValue}`);
+    let newBody = body;
+    if (quotedRe.test(body)) {
+      newBody = body.replace(quotedRe, (_m, pre, q) => `${pre}${q}${newValue}${q}`);
+    } else if (bareRe.test(body)) {
+      newBody = body.replace(bareRe, `$1${newValue}`);
     }
 
-    if (newContent !== content) {
+    if (newBody !== body) {
+      const newContent = content.slice(0, start) + newBody + content.slice(end);
       writeFileSync(filePath, newContent, 'utf-8');
       return { patched: true, file: relative(projectRoot, filePath) };
     }
@@ -168,7 +199,7 @@ function patchTsx(
 }
 
 // ── CSS / SCSS patcher ───────────────────────────────────────────────────────
-// Same rationale: match on property name only, replace whatever value follows.
+// Finds the CSS file that contains the selector and patches the property value.
 
 function patchCss(
   projectRoot: string,
@@ -179,23 +210,25 @@ function patchCss(
 ): { patched: boolean; file?: string } {
   const files = scanFiles(projectRoot, ['.css', '.scss', '.sass', '.less']);
 
+  // Use simple class/id/tag segments from the selector to identify candidate files
+  const selectorParts = selector.match(/[.#]?[a-zA-Z0-9_-]+/g) ?? [];
+
   for (const filePath of files) {
     let content: string;
     try { content = readFileSync(filePath, 'utf-8'); } catch { continue; }
 
-    // Only patch if this file mentions the selector (or part of it)
-    // Use the last simple segment of the selector for a quick sanity check
-    const selectorHint = selector.split(/[\s>+~]/).pop() ?? selector;
-    const hasSelectorHint = content.includes(selectorHint);
+    // Skip Tailwind output / non-authored CSS (usually in dist/build directories)
+    // and files that don't contain any part of the selector
+    const hasRelevantSelector = selectorParts.some(part => content.includes(part));
+    if (!hasRelevantSelector) continue;
 
-    // Replace: property: <anything>; (respects semicolon or end-of-block)
+    // Pattern: property: <value up to ; or }> — first match in this file
     const pattern = new RegExp(
-      `(${escapeRegex(property)}\\s*:\\s*)[^;{}\\n]+?(\\s*(?:!important)?\\s*(?:;|(?=[}\\n])))`,
-      'gm'
+      `(${escapeRegex(property)}\\s*:\\s*)[^;{}\\n]+(\\s*;)`,
+      'm'
     );
 
     if (!pattern.test(content)) continue;
-    if (!hasSelectorHint) continue;
 
     const newContent = content.replace(pattern, `$1${newValue}$2`);
     if (newContent === content) continue;
@@ -218,24 +251,13 @@ const CSS_ENTRY_CANDIDATES = [
   'index.css', 'global.css', 'globals.css',
 ];
 
-function ensureOverrideImport(projectRoot: string): void {
-  const importLine = "@import './optate-overrides.css';";
-  const importLineAlt = '@import "./optate-overrides.css";';
-
+/** Find the CSS entry file and return its absolute path, or null */
+function findCssEntry(projectRoot: string): string | null {
   for (const candidate of CSS_ENTRY_CANDIDATES) {
-    const candidatePath = resolve(projectRoot, candidate);
-    if (!existsSync(candidatePath)) continue;
-
-    let content: string;
-    try { content = readFileSync(candidatePath, 'utf-8'); } catch { continue; }
-
-    if (content.includes('optate-overrides.css')) return; // already imported
-
-    // Prepend the import so it can be overridden by later rules
-    writeFileSync(candidatePath, importLine + '\n' + content, 'utf-8');
-    return;
+    const p = resolve(projectRoot, candidate);
+    if (existsSync(p)) return p;
   }
-  // No entry file found — silently skip; user must import manually
+  return null;
 }
 
 function writeOverrideCss(
@@ -244,7 +266,11 @@ function writeOverrideCss(
   property: string,
   newValue: string
 ): string {
-  const overridePath = resolve(projectRoot, 'optate-overrides.css');
+  // Write the override file into the same directory as the CSS entry so
+  // the relative import path is always correct (./optate-overrides.css).
+  const entryFile = findCssEntry(projectRoot);
+  const overrideDir = entryFile ? dirname(entryFile) : projectRoot;
+  const overridePath = resolve(overrideDir, 'optate-overrides.css');
 
   // Group selector+property in a comment-tagged block so we can find + update it
   const blockTag = `/* optate:${selector}|${property} */`;
@@ -265,10 +291,20 @@ function writeOverrideCss(
     newContent = existing ? existing + '\n' + rule : rule;
   }
 
+  mkdirSync(overrideDir, { recursive: true });
   writeFileSync(overridePath, newContent.trim() + '\n', 'utf-8');
 
-  // Auto-import the override file into the project's main CSS entry
-  ensureOverrideImport(projectRoot);
+  // Auto-import into the CSS entry file if not already there
+  if (entryFile) {
+    try {
+      let entryCss = readFileSync(entryFile, 'utf-8');
+      if (!entryCss.includes('optate-overrides.css')) {
+        // Append at the end so it wins specificity over base/tailwind rules
+        entryCss = entryCss.trimEnd() + "\n@import './optate-overrides.css';\n";
+        writeFileSync(entryFile, entryCss, 'utf-8');
+      }
+    } catch { /* silently skip */ }
+  }
 
   return relative(projectRoot, overridePath);
 }
