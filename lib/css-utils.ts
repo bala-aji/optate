@@ -20,9 +20,15 @@ export function applyStyle(el: HTMLElement, property: string, value: string): st
 /**
  * Normalizes color values to hex for consistent reporting.
  */
-export function rgbToHex(rgb: string): string {
+export function rgbToHex(rgb: string | number, g?: number, b?: number): string {
+  // Called with 3 separate numbers: rgbToHex(r, g, b)
+  if (typeof rgb === 'number') {
+    return '#' + ((1 << 24) + (rgb << 16) + ((g ?? 0) << 8) + (b ?? 0))
+      .toString(16).slice(1).toUpperCase();
+  }
   if (rgb.startsWith('#')) return rgb;
-  const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  const match = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return rgb;
-  return "#" + ((1 << 24) + (parseInt(match[1]) << 16) + (parseInt(match[2]) << 8) + parseInt(match[3])).toString(16).slice(1).toUpperCase();
+  return '#' + ((1 << 24) + (parseInt(match[1]) << 16) + (parseInt(match[2]) << 8) + parseInt(match[3]))
+    .toString(16).slice(1).toUpperCase();
 }
